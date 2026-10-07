@@ -10,7 +10,8 @@ from app.utils.logger import logger
 router = Router(name="group_events_router")
 
 
-@router.my_chat_member(ChatMemberUpdatedFilter(JOIN_TRANSITION | PROMOTED_TRANSITION))
+@router.my_chat_member(ChatMemberUpdatedFilter(JOIN_TRANSITION))
+@router.my_chat_member(ChatMemberUpdatedFilter(PROMOTED_TRANSITION))
 async def bot_added_or_promoted(event: ChatMemberUpdated, bot: Bot, session: AsyncSession) -> None:
     """Triggered when bot is added to a group or promoted to administrator."""
     chat = event.chat
