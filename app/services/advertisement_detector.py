@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, List, Set, Optional
 from aiogram.types import Message
-from aiogram.enums import MessageEntityType, ContentType
+from aiogram.enums import MessageEntityType
 
 from app.utils.text_utils import normalize_text, cyrillic_to_latin, extract_phone_numbers, extract_mentions
 from app.utils.link_parser import extract_links, extract_domain, is_domain_whitelisted
@@ -10,52 +10,207 @@ from app.utils.logger import logger
 
 class AdvertisementDetector:
     """
-    Production-grade Advertisement Detection Engine with:
-    - Multi-factor scoring system
-    - Whitelist & Blacklist integration
-    - False-positive mitigation
-    - Telegram entities inspection (URL, TEXT_LINK, MENTION)
-    - Full Cyrillic and Latin Uzbek/Russian vocabulary support
+    Production-grade Multi-Factor Advertisement Detection Engine.
+    
+    Categorized Lexicon (Uzbek 🇺🇿, Russian 🇷🇺, English 🇬🇧):
+    - Sales & Commercial Offers (Sotuv / Taklif / Продажа / Sales)
+    - Call to Action (CTA / Harakatga chaqirish / CTA)
+    - Contact Indicators (Kontakt / Контакт / Contact)
+    - Multi-Factor Synergy & Combination Signals
+    - False-Positive Safeguards & Whitelist / Blacklist integration
     """
 
-    # Scoring weights as specified in system requirements
-    KEYWORD_WEIGHTS: Dict[str, int] = {
-        # High impact
+    # 1. High-impact direct advertising signals (immediate 35-40 points)
+    HIGH_IMPACT_PHRASES: Dict[str, int] = {
+        # Uzbek
         "reklama": 40,
-        "admin bilan bog'laning": 25,
-        "admin bilan boglaning": 25,
-        "bog'lanish uchun": 20,
-        "boglanish uchun": 20,
-        "murojaat uchun": 20,
-        "obuna bo'ling": 25,
-        "obuna boling": 25,
-        "kanalimizga obuna": 30,
-        "kanalga obuna": 30,
-        "obuna": 20,
+        "reklama berish": 40,
+        "reklama uchun": 40,
+        "kanalga obuna": 35,
+        "kanalimizga obuna": 35,
+        "obuna bo'ling": 35,
+        "obuna boling": 35,
+        "kanalga kiring": 30,
+        "kanalimizga kiring": 30,
+        "pul ishlash": 30,
+        "daromad qilish": 30,
+        "mijoz qidiramiz": 30,
+        "maxsus taklif": 25,
+        "foydali taklif": 25,
+        "hozir buyurtma bering": 30,
 
-        # Medium impact commercial terms
+        # Russian
+        "реклама": 40,
+        "рекламное предложение": 40,
+        "подписывайтесь": 35,
+        "подпишитесь": 35,
+        "переходите по ссылке": 35,
+        "заказать сейчас": 30,
+        "купить сейчас": 30,
+        "выгодное предложение": 25,
+        "заработок": 30,
+
+        # English
+        "advertising": 40,
+        "advertisement": 40,
+        "special offer": 30,
+        "buy now": 30,
+        "order now": 30,
+        "earn money": 30,
+        "make money": 30,
+        "business opportunity": 30,
+        "subscribe": 30,
+        "join us": 25,
+    }
+
+    # 2. Sales & Offer terms (Sotuv / Taklif / Продажа / Sales) (15-20 points)
+    SALES_TERMS: Dict[str, int] = {
+        # Uzbek
         "sotiladi": 20,
         "sotamiz": 20,
+        "sotib oling": 20,
+        "buyurtma": 15,
+        "buyurtma berish": 20,
+        "zakaz": 15,
+        "narxi": 10,
+        "narx": 10,
+        "chegirma": 15,
+        "chegirmalar": 15,
         "aksiya": 20,
         "aktsiya": 20,
-        "chegirma": 20,
-        "skidka": 20,
-        "zakaz": 15,
-        "buyurtma": 15,
+        "skidka": 15,
+        "bepul": 15,
+        "yangi mahsulot": 15,
+        "mahsulot": 10,
+        "xizmat": 10,
+        "xizmatlar": 10,
+        "hamkorlik": 15,
+        "hamkorlik uchun": 20,
+        "mijozlar": 15,
+        "daromad": 15,
         "dostavka": 15,
         "yetkazib berish": 15,
-        "kurs": 15,
-        "narx": 10,
-        "narxi": 10,
-        "murojaat": 10,
+
+        # Russian
+        "продаю": 20,
+        "продаем": 20,
+        "продаём": 20,
+        "продажа": 20,
+        "купить": 15,
+        "покупайте": 20,
+        "закажите": 20,
+        "заказать": 15,
+        "заказ": 15,
+        "цена": 10,
+        "стоимость": 10,
+        "скидка": 15,
+        "скидки": 15,
+        "акция": 20,
+        "распродажа": 20,
+        "предложение": 10,
+        "товар": 10,
+        "услуги": 10,
+        "сотрудничество": 15,
+        "доход": 15,
+        "прибыль": 15,
+
+        # English
+        "for sale": 20,
+        "buy": 15,
+        "order": 15,
+        "purchase": 15,
+        "price": 10,
+        "discount": 15,
+        "sale": 15,
+        "offer": 10,
+        "deal": 10,
+        "promotion": 15,
+        "product": 10,
+        "service": 10,
+        "services": 10,
+        "partnership": 15,
+        "income": 15,
+    }
+
+    # 3. Call to Action terms (CTA / Harakatga chaqirish) (15-20 points)
+    CTA_TERMS: Dict[str, int] = {
+        # Uzbek
+        "murojaat qiling": 20,
+        "murojaat uchun": 20,
+        "bog'laning": 20,
+        "boglaning": 20,
+        "bizga yozing": 20,
+        "yozing": 10,
+        "hoziroq": 15,
+        "buyurtma uchun": 20,
+        "batafsil ma'lumot": 20,
+        "batafsil malumot": 20,
+        "batafsil": 10,
+        "link orqali": 20,
+        "havola orqali": 20,
+        "qo'shiling": 15,
+        "qoshiling": 15,
+
+        # Russian
+        "пишите": 10,
+        "напишите нам": 20,
+        "обращайтесь": 20,
+        "звоните": 15,
+        "подробнее": 10,
+        "подробности": 10,
+        "переходите": 15,
+        "по ссылке": 20,
+        "присоединяйтесь": 15,
+
+        # English
+        "contact us": 20,
+        "contact me": 20,
+        "message us": 20,
+        "dm me": 20,
+        "dm us": 20,
+        "learn more": 15,
+        "click here": 20,
+        "click the link": 20,
+        "visit": 10,
+    }
+
+    # 4. Contact Indicators (Kontakt) (10-15 points)
+    CONTACT_TERMS: Dict[str, int] = {
+        # Uzbek
+        "admin": 10,
+        "administrator": 10,
+        "menejer": 10,
+        "manager": 10,
+        "operator": 10,
         "telefon": 10,
-        "kanal": 15,
-        "telegram": 15,
-        "instagram": 15,
-        "so'm": 10,
-        "som": 10,
-        "dollar": 10,
-        "usd": 10,
+        "tel": 5,
+        "lichka": 15,
+        "shaxsiy xabar": 15,
+        "telegram": 10,
+        "instagram": 10,
+        "whatsapp": 10,
+
+        # Russian
+        "админ": 10,
+        "администратор": 10,
+        "менеджер": 10,
+        "оператор": 10,
+        "телефон": 10,
+        "тел": 5,
+        "в личку": 15,
+        "лс": 15,
+        "личные сообщения": 15,
+
+        # English
+        "admin": 10,
+        "administrator": 10,
+        "manager": 10,
+        "operator": 10,
+        "phone": 10,
+        "whatsapp": 10,
+        "telegram": 10,
+        "dm": 15,
+        "pm": 15,
     }
 
     URL_SCORE = 40
@@ -141,18 +296,8 @@ class AdvertisementDetector:
         threshold: int = DEFAULT_THRESHOLD
     ) -> Dict[str, Any]:
         """
-        Analyzes a Telegram message for commercial advertisements.
-
-        Returns:
-            {
-                "is_ad": bool,
-                "score": int,
-                "reasons": list[str],
-                "links": list[str],
-                "phones": list[str],
-                "mentions": list[str],
-                "message_type": str
-            }
+        Analyzes a Telegram message for commercial advertisements using
+        multi-factor scoring and category combinations.
         """
         whitelist_domains = whitelist_domains or []
         blacklist_words = blacklist_words or set()
@@ -179,7 +324,6 @@ class AdvertisementDetector:
         # -------------------------------------------------------------
         # STEP 1: BLACKLIST CHECKS (Immediate 100-score Ad flag)
         # -------------------------------------------------------------
-        # Check blacklisted words
         for bl_word in blacklist_words:
             if not bl_word:
                 continue
@@ -196,7 +340,6 @@ class AdvertisementDetector:
                     "message_type": msg_type
                 }
 
-        # Check blacklisted domains in extracted links
         for link in all_links:
             dom = extract_domain(link)
             if dom in blacklist_domains:
@@ -210,7 +353,6 @@ class AdvertisementDetector:
                     "message_type": msg_type
                 }
 
-        # Check blacklisted usernames in mentions
         for mention in all_mentions:
             u_name = mention.lstrip("@").lower()
             if u_name in blacklist_usernames:
@@ -232,57 +374,111 @@ class AdvertisementDetector:
             if not is_domain_whitelisted(link, whitelist_domains):
                 non_whitelisted_links.append(link)
 
-        if non_whitelisted_links:
+        has_url = bool(non_whitelisted_links)
+        if has_url:
             score += cls.URL_SCORE
             reasons.append("external_url")
 
         # -------------------------------------------------------------
         # STEP 3: MENTIONS & TELEGRAM CHANNELS SCORING
         # -------------------------------------------------------------
-        if all_mentions:
+        has_mention = bool(all_mentions)
+        if has_mention:
             score += cls.MENTION_SCORE
             reasons.append("telegram_mention")
 
         # -------------------------------------------------------------
         # STEP 4: PHONE NUMBER SCORING
         # -------------------------------------------------------------
-        if phones:
+        has_phone = bool(phones)
+        if has_phone:
             score += cls.PHONE_SCORE
             reasons.append("phone_number")
 
         # -------------------------------------------------------------
-        # STEP 5: KEYWORD SCORING (Phrase & Word boundary checks)
+        # STEP 5: CATEGORIZED KEYWORDS INSPECTION
         # -------------------------------------------------------------
-        found_keywords: Set[str] = set()
-        for kw, kw_weight in cls.KEYWORD_WEIGHTS.items():
-            kw_clean = cyrillic_to_latin(kw).lower()
-            # For multi-word phrases (e.g. "admin bilan bog'laning")
-            if " " in kw_clean:
-                pattern = re.compile(rf'\b{re.escape(kw_clean)}\b', re.IGNORECASE)
-                if pattern.search(latin_text):
-                    score += kw_weight
-                    found_keywords.add(kw)
-            else:
-                # For single words, use regex word boundaries
-                pattern = re.compile(rf'\b{re.escape(kw_clean)}\b', re.IGNORECASE)
-                if pattern.search(latin_text):
-                    score += kw_weight
-                    found_keywords.add(kw)
+        found_high_impact: Set[str] = set()
+        found_sales: Set[str] = set()
+        found_cta: Set[str] = set()
+        found_contact: Set[str] = set()
 
-        if found_keywords:
-            reasons.append(f"keywords: {', '.join(sorted(found_keywords))}")
+        # A. High Impact Phrases
+        for phrase, weight in cls.HIGH_IMPACT_PHRASES.items():
+            phrase_clean = cyrillic_to_latin(phrase).lower()
+            pattern = re.compile(rf'\b{re.escape(phrase_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_high_impact.add(phrase)
+
+        # B. Sales Terms
+        for term, weight in cls.SALES_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_sales.add(term)
+
+        # C. CTA Terms
+        for term, weight in cls.CTA_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_cta.add(term)
+
+        # D. Contact Terms
+        for term, weight in cls.CONTACT_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_contact.add(term)
+
+        # E. Numerical Discount & Price Patterns
+        discount_pattern = re.compile(r'\b\d+\s*%\s*(chegirma|skidka|skidk|off|discount|aksiya|aktsiya|sale)\b', re.IGNORECASE)
+        has_discount_percent = bool(discount_pattern.search(latin_text))
+        if has_discount_percent:
+            score += 25
+            reasons.append("discount_percentage_pattern")
+
+        all_detected_kws = found_high_impact | found_sales | found_cta | found_contact
+        if all_detected_kws:
+            reasons.append(f"keywords: {', '.join(sorted(all_detected_kws))}")
 
         # -------------------------------------------------------------
-        # STEP 6: FALSE POSITIVE PREVENTION
+        # STEP 6: MULTI-FACTOR COMBINATION SYNERGY (Kombinatsiyalar)
         # -------------------------------------------------------------
-        # Case A: If message has ONLY whitelisted link and zero commercial keywords -> score 0
-        if all_links and not non_whitelisted_links and not found_keywords and not phones:
+        has_sales = bool(found_sales or found_high_impact or has_discount_percent)
+        has_cta = bool(found_cta)
+        has_contact = bool(found_contact or has_phone or has_mention)
+
+        # Combination 1: (Sales + CTA)
+        if has_sales and has_cta:
+            score += 20
+            reasons.append("combo_sales_and_cta")
+
+        # Combination 2: (Sales + Direct Link or Contact)
+        if has_sales and (has_url or has_contact):
+            score += 20
+            reasons.append("combo_sales_and_contact")
+
+        # Combination 3: (CTA + Direct Link or Phone)
+        if has_cta and (has_url or has_phone):
+            score += 20
+            reasons.append("combo_cta_and_link")
+
+        # -------------------------------------------------------------
+        # STEP 7: FALSE POSITIVE SAFEGUARDS
+        # -------------------------------------------------------------
+        # If message only has a whitelisted link with zero commercial keywords -> reset score
+        if all_links and not non_whitelisted_links and not all_detected_kws and not phones:
             score = 0
             reasons.clear()
 
-        # Case B: If message has only a single casual mention without commercial intent -> keep below threshold
-        if not non_whitelisted_links and not phones and len(found_keywords) <= 1 and score < threshold:
-            pass  # Normal behavior, score remains low
+        # If message is just a simple innocent question with 1 weak keyword ("soat", "telefonim")
+        if not non_whitelisted_links and not phones and not has_cta and len(found_sales) <= 1 and score < threshold:
+            pass  # Remains below threshold safely
 
         is_ad = score >= threshold
 

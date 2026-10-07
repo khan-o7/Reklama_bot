@@ -117,3 +117,33 @@ def test_media_caption_detection():
     assert res["is_ad"] is True
     assert res["message_type"] == "PHOTO"
     assert res["score"] >= 40
+
+
+def test_russian_ad_detection():
+    # Russian commercial message: скидки (+15) + пишите нам (+20) + combo (+20) = 55
+    msg = create_mock_message(text="Большие скидки на все товары! Напишите нам в личку для заказа.")
+    res = AdvertisementDetector.analyze_message(msg)
+    assert res["is_ad"] is True
+    assert res["score"] >= 40
+
+
+def test_english_ad_detection():
+    # English commercial message: special offer (+30) + order now (+30) = 60
+    msg = create_mock_message(text="Special offer! Order now and get a great discount.")
+    res = AdvertisementDetector.analyze_message(msg)
+    assert res["is_ad"] is True
+    assert res["score"] >= 40
+
+
+def test_combination_vs_casual():
+    # 1. Casual: "Bugun chegirma bor" (single sales term, no CTA, no contact, no URL) -> not an ad
+    msg_casual = create_mock_message(text="Bugun do‘konda chegirma bor ekan")
+    res_casual = AdvertisementDetector.analyze_message(msg_casual)
+    assert res_casual["is_ad"] is False
+    assert res_casual["score"] < 40
+
+    # 2. Strong Combo: "🔥 50% chegirma! Hoziroq buyurtma bering. Batafsil: https://t.me/kanal"
+    msg_combo = create_mock_message(text="🔥 50% chegirma! Hoziroq buyurtma bering. Batafsil: https://t.me/kanal")
+    res_combo = AdvertisementDetector.analyze_message(msg_combo)
+    assert res_combo["is_ad"] is True
+    assert res_combo["score"] >= 80
