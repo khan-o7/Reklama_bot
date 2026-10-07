@@ -27,7 +27,7 @@ class ErrorHandlerMiddleware(BaseMiddleware):
         except TelegramBadRequest as e:
             logger.warning(f"Telegram API Bad Request: {e}")
         except TelegramNetworkError as e:
-            logger.warning(f"Telegram API Network transient hiccup (auto-retrying): {e}")
+            logger.debug(f"Telegram API Network transient retry (auto-retrying): {e}")
         except Exception as e:
             logger.exception(f"Unhandled error in Telegram update handler: {e}")
             return None
