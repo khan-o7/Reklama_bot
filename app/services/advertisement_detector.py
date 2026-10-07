@@ -589,18 +589,36 @@ class AdvertisementDetector:
             reasons.append("combo_cta_and_link")
 
         # -------------------------------------------------------------
-        # STEP 7: FALSE POSITIVE SAFEGUARDS
+        # STEP 7: FALSE POSITIVE SAFEGUARDS & STRICT KEYWORD MATCHING
         # -------------------------------------------------------------
         # If message only has a whitelisted link with zero commercial keywords -> reset score
         if all_links and not non_whitelisted_links and not all_detected_kws and not phones:
             score = 0
             reasons.clear()
 
-        # If message is just a simple innocent question with 1 weak keyword ("soat", "telefonim")
-        if not non_whitelisted_links and not phones and not has_cta and len(found_sales) <= 1 and score < threshold:
-            pass  # Remains below threshold safely
+        # Strict Keyword Mode (Direct Match):
+        # If ANY detected advertising/sales/marketing keywords, unwhitelisted URL, phone or mention are present,
+        # flag immediately as AD (score = 100, is_ad = True) so message is deleted without requiring cumulative score.
+        is_direct_match = bool(
+            found_high_impact or
+            found_sales or
+            found_discount or
+            found_crypto or
+            found_income or
+            has_discount_percent or
+            has_price_currency or
+            has_url or
+            has_phone or
+            has_mention or
+            (found_cta and (found_education or found_business or found_contact)) or
+            (len(found_cta) >= 2)
+        )
 
-        is_ad = score >= threshold
+        if is_direct_match:
+            score = max(score, 100)
+            is_ad = True
+        else:
+            is_ad = score >= threshold
 
         return {
             "is_ad": is_ad,

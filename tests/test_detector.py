@@ -136,8 +136,8 @@ def test_english_ad_detection():
 
 
 def test_combination_vs_casual():
-    # 1. Casual: "Bugun chegirma bor" (single sales term, no CTA, no contact, no URL) -> not an ad
-    msg_casual = create_mock_message(text="Bugun do‘konda chegirma bor ekan")
+    # 1. Casual: "Bugun do‘konda yangi narsalar ko‘p ekan" (no ad keywords) -> not an ad
+    msg_casual = create_mock_message(text="Bugun do‘konda yangi narsalar ko‘p ekan")
     res_casual = AdvertisementDetector.analyze_message(msg_casual)
     assert res_casual["is_ad"] is False
     assert res_casual["score"] < 40
