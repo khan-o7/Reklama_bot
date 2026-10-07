@@ -226,15 +226,40 @@ class ModerationService:
 
         # 7. Send Otmetka Warning to User in Group
         if warning_enabled:
-            # Otmetka foydalanuvchini (username yoki nomini bosganda profil ochiladigan qilib)
+            # Format user mention
             user_mention = f"@{user.username}" if user.username else f'<a href="tg://user?id={user_id}">{user.full_name}</a>'
 
-            warn_msg_content = (
-                f"⚠️ <b>REKLAMA TAQIQLANGAN!</b>\n\n"
-                f"Hurmatli {user_mention}, reklama uchun <b>botga murojaat qiling!</b>\n\n"
-                f"📊 <i>Ogohlantirishlar soni: {warnings_count}</i>"
-            )
-            if penalty_text:
+            if warnings_count == 1:
+                warn_msg_content = (
+                    f"⚠️ <b>REKLAMA TAQIQLANGAN!</b>\n\n"
+                    f"Hurmatli {user_mention}, guruhda ruxsatsiz reklama tarqatish taqiqlangan!\n"
+                    f"Reklama bermoqchi bo‘lsangiz, <b>botga murojaat qiling!</b>\n\n"
+                    f"📊 <b>Holat:</b> 1-ogohlantirish\n"
+                    f"⚡️ <i>Eslatma: Yana reklama yuborsangiz, 10 daqiqa yozishdan cheklanasiz (MUTE).</i>"
+                )
+            elif warnings_count == 2:
+                warn_msg_content = (
+                    f"⚠️ <b>QAYTA REKLAMA ANIQLANDI!</b>\n\n"
+                    f"Hurmatli {user_mention}, sizga avval ogohlantirish berilgan edi.\n\n"
+                    f"📊 <b>Holat:</b> 2-ogohlantirish\n"
+                    f"🔇 <b>Jazo:</b> 10 daqiqaga guruhda yozish cheklandi (MUTE).\n"
+                    f"⚡️ <i>Eslatma: Keyingi reklamada 1 soatlik MUTE qo‘llaniladi.</i>"
+                )
+            elif warnings_count == 3:
+                warn_msg_content = (
+                    f"⚠️ <b>QAYTA REKLAMA ANIQLANDI!</b>\n\n"
+                    f"Hurmatli {user_mention}, qoidabuzarlik davom etmoqda.\n\n"
+                    f"📊 <b>Holat:</b> 3-ogohlantirish\n"
+                    f"🔇 <b>Jazo:</b> 1 soatga guruhda yozish cheklandi (MUTE).\n"
+                    f"🚫 <i>Eslatma: Yana reklama yuborsangiz, guruhdan butunlay chetlatilasiz (BAN).</i>"
+                )
+            else:
+                warn_msg_content = (
+                    f"🚫 <b>GURUHDAN CHETLATILDI (BAN)!</b>\n\n"
+                    f"Foydalanuvchi {user_mention} ketma-ket reklama tashlagani sababli guruhdan butunlay chetlatildi (BAN)."
+                )
+
+            if penalty_text and "yetarli emas" in penalty_text:
                 warn_msg_content += f"\n\n{penalty_text}"
 
             try:
