@@ -97,6 +97,7 @@ async def handle_help(message: Message) -> None:
             "• /blacklist — Qora ro‘yxatni ko‘rish va boshqarish\n"
             "• /whitelist — Oq ro‘yxat (ruxsat etilgan domenlar)\n"
             "• /warnings — Foydalanuvchining ogohlantirishlarini ko‘rish\n"
+            "• /clusters — Takroriy reklama va kampaniyalarni AI klasterlash\n"
             "• /mute — Foydalanuvchini yozishdan cheklash (reply qilib)\n"
             "• /unmute — Foydalanuvchidan cheklovni yechish\n"
             "• /ban — Foydalanuvchini guruhdan chetlatish\n"

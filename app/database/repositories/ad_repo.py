@@ -94,3 +94,19 @@ class AdvertisementRepository:
                 "count": count
             })
         return data
+
+    @staticmethod
+    async def get_all_texts(session: AsyncSession, limit: int = 1000) -> List[str]:
+        """Fetches raw text and caption from recent advertisements for AI clustering."""
+        stmt = (
+            select(Advertisement.text, Advertisement.caption)
+            .order_by(desc(Advertisement.created_at))
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        texts = []
+        for text, caption in result.all():
+            combined = (text or "") + " " + (caption or "")
+            if combined.strip():
+                texts.append(combined.strip())
+        return texts

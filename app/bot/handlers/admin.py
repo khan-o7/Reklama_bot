@@ -11,7 +11,9 @@ from app.database.repositories.group_repo import GroupRepository
 from app.database.repositories.list_repo import ListRepository
 from app.database.repositories.setting_repo import SettingRepository
 from app.database.repositories.audit_repo import AuditRepository
+from app.database.repositories.ad_repo import AdvertisementRepository
 from app.services.statistics_service import StatisticsService
+from app.services.cluster_service import ClusterService
 from app.services.cache_service import cache
 from app.bot.keyboards.admin_kb import get_admin_main_menu, get_back_to_admin_menu
 from app.utils.logger import logger
@@ -562,3 +564,41 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
         f"Quyidagi menyu orqali botni boshqarishingiz mumkin:"
     )
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_main_menu())
+
+
+# ==========================================
+# /clusters Command (AI Semantic Ad Clusters)
+# ==========================================
+@router.message(Command("clusters"))
+async def cmd_clusters(message: Message, bot: Bot, session: AsyncSession) -> None:
+    if not await is_authorized(message, bot):
+        await message.reply(NO_PERMISSION_TEXT)
+        return
+
+    ad_texts = await AdvertisementRepository.get_all_texts(session, limit=500)
+    if not ad_texts:
+        await message.reply("📊 Hozircha klasterlash uchun yetarli reklama xabarlari mavjud emas.")
+        return
+
+    clusters = ClusterService.cluster_advertisements(ad_texts)
+    if not clusters:
+        await message.reply("📊 Hozircha faol reklama klasterlari aniqlanmadi.")
+        return
+
+    lines = ["🧠 <b>AI REKLAMA KLASTERLARI VA KAMPANIYALAR:</b>\n"]
+    for c in clusters[:6]:
+        kws_str = ", ".join(c.keywords[:4]) if c.keywords else "aniqlanmoqda"
+        samples_preview = ""
+        if c.sample_texts:
+            sample_clean = c.sample_texts[0].replace("\n", " ")[:60]
+            samples_preview = f"\n  <i>Namuna:</i> \"{sample_clean}...\""
+
+        lines.append(
+            f"🔹 <b>Klaster #{c.cluster_id}: {c.topic}</b>\n"
+            f"• Xabarlar soni: <b>{c.message_count} ta</b>\n"
+            f"• Reklama ishonchliligi: <b>{c.confidence_pct}%</b>\n"
+            f"• Kalit so‘zlar: <code>{kws_str}</code>"
+            f"{samples_preview}\n"
+        )
+
+    await message.reply("\n".join(lines), parse_mode="HTML")
