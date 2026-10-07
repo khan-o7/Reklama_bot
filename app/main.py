@@ -89,7 +89,33 @@ async def main():
         logger.info("Bot and database connections closed gracefully.")
 
 
+import socket
+
+
+def acquire_single_instance_lock(port: int = 49151):
+    """
+    Ensures only ONE instance of Defender Bot can run at any time on this machine.
+    Prevents duplicate Telegram polling, web port 8000 collisions, and Errno 10048.
+    """
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(("127.0.0.1", port))
+        s.listen(1)
+        return s
+    except OSError:
+        return None
+
+
 if __name__ == "__main__":
+    lock_socket = acquire_single_instance_lock(port=49151)
+    if not lock_socket:
+        logger.error(
+            "❌ DIQQAT: Defender Bot allaqachon boshqa terminal yoki fonda ishlab turibdi!\n"
+            "Ikkita nusxa bir vaqtda ishlay olmaydi (Telegram polling va Web Admin port 8000 ziddiyati yuzaga keladi).\n"
+            "Iltimos, avvalgi ishlayotgan oynani yoping yoki eski python jarayonini to'xtating."
+        )
+        sys.exit(0)
+
     if sys.platform == "win32":
         # WindowsSelectorEventLoopPolicy eliminates WinError 52 and socket IOCP issues with aiohttp
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -97,3 +123,8 @@ if __name__ == "__main__":
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         pass
+    finally:
+        try:
+            lock_socket.close()
+        except Exception:
+            pass
