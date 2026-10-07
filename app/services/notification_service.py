@@ -62,38 +62,38 @@ class NotificationService:
         admin_ids = settings.all_admin_ids
 
         for admin_id in admin_ids:
-            try:
-                # 1. Send text alert
-                await bot.send_message(
-                    chat_id=admin_id,
-                    text=alert_text,
-                    parse_mode="HTML"
-                )
-
-                # 2. Try copying original message so admin sees exact media & formatting
+            for attempt in range(1, 3):
                 try:
-                    await bot.copy_message(
+                    # 1. Send text alert
+                    await bot.send_message(
                         chat_id=admin_id,
-                        from_chat_id=message.chat.id,
-                        message_id=message.message_id
+                        text=alert_text,
+                        parse_mode="HTML"
                     )
-                except Exception as copy_err:
-                    # Fallback if original was already deleted or forward restricted:
-                    # Reconstruct and send manually
-                    logger.debug(f"Direct copy failed for admin {admin_id}: {copy_err}. Falling back to content re-send.")
-                    await NotificationService._fallback_send_content(bot, admin_id, message)
 
-            except TelegramRetryAfter as e:
-                logger.warning(f"Flood limit when notifying admin {admin_id}. Retrying after {e.retry_after}s.")
-                await asyncio.sleep(e.retry_after)
-                try:
-                    await bot.send_message(chat_id=admin_id, text=alert_text, parse_mode="HTML")
-                except Exception:
-                    pass
-            except TelegramForbiddenError:
-                logger.debug(f"Bot was blocked by admin {admin_id} or private chat not started.")
-            except Exception as e:
-                logger.error(f"Failed to send notification to admin {admin_id}: {e}")
+                    # 2. Try copying original message so admin sees exact media & formatting
+                    try:
+                        await bot.copy_message(
+                            chat_id=admin_id,
+                            from_chat_id=message.chat.id,
+                            message_id=message.message_id
+                        )
+                    except Exception as copy_err:
+                        # Fallback if original was already deleted or forward restricted:
+                        logger.debug(f"Direct copy failed for admin {admin_id}: {copy_err}. Falling back to content re-send.")
+                        await NotificationService._fallback_send_content(bot, admin_id, message)
+                    break
+                except TelegramRetryAfter as e:
+                    logger.warning(f"Flood limit when notifying admin {admin_id}. Retrying after {e.retry_after}s.")
+                    await asyncio.sleep(e.retry_after)
+                except TelegramForbiddenError:
+                    logger.debug(f"Bot was blocked by admin {admin_id} or private chat not started.")
+                    break
+                except Exception as e:
+                    if attempt < 2:
+                        await asyncio.sleep(1.5)
+                    else:
+                        logger.warning(f"Could not deliver notification to admin {admin_id}: {e}")
 
     @staticmethod
     async def _fallback_send_content(bot: Bot, admin_id: int, message: Message) -> None:

@@ -89,15 +89,20 @@ class ActiveLearningService:
         )
 
         for admin_id in settings.all_admin_ids:
-            try:
-                await bot.send_message(
-                    chat_id=admin_id,
-                    text=card_text,
-                    parse_mode="HTML",
-                    reply_markup=review_kb
-                )
-            except Exception as e:
-                logger.error(f"Failed to send active learning card to admin {admin_id}: {e}")
+            for attempt in range(1, 4):
+                try:
+                    await bot.send_message(
+                        chat_id=admin_id,
+                        text=card_text,
+                        parse_mode="HTML",
+                        reply_markup=review_kb
+                    )
+                    break
+                except Exception as e:
+                    if attempt < 3:
+                        await asyncio.sleep(1.5)
+                    else:
+                        logger.warning(f"Could not deliver active learning card to admin {admin_id}: {e}")
 
         return sample.id
 
