@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Defender Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Boshqaruv Paneli</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Guruhlar va reklama himoyasining umumiy ko‘rsatkichlari</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <span class="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold rounded-lg flex items-center space-x-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Tizim: FAOL</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Stats 7-grid Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total Groups -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Jami Guruhlar</p>
+                    <h3 class="text-2xl font-bold text-white mt-1">{{ total_groups }}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center text-lg border border-blue-500/20">
+                    <i class="fa-solid fa-users-viewfinder"></i>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">Faol himoyalangan guruhlar</p>
+        </div>
+
+        <!-- Total Users -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Jami Userlar</p>
+                    <h3 class="text-2xl font-bold text-white mt-1">{{ total_users }}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-lg border border-indigo-500/20">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">Ro‘yxatdan o‘tgan a’zolar</p>
+        </div>
+
+        <!-- Today Ads -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Bugungi Reklamalar</p>
+                    <h3 class="text-2xl font-bold text-amber-400 mt-1">{{ today_ads }}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-lg border border-amber-500/20">
+                    <i class="fa-solid fa-rectangle-ad"></i>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">Aniqlangan tijoriy xabarlar</p>
+        </div>
+
+        <!-- Today Deleted -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">O‘chirilgan Xabarlar</p>
+                    <h3 class="text-2xl font-bold text-emerald-400 mt-1">{{ today_deleted }}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-lg border border-emerald-500/20">
+                    <i class="fa-solid fa-trash-can"></i>
+                </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-3">Guruhdan tozalanganlar</p>
+        </div>
+    </div>
+
+    <!-- Secondary 3 Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Today Warnings -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center text-xl border border-yellow-500/20">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-slate-400">Bugungi Ogohlantirishlar</p>
+                <h4 class="text-xl font-bold text-white mt-0.5">{{ today_warnings }}</h4>
+            </div>
+        </div>
+
+        <!-- Today Muted -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl border border-purple-500/20">
+                <i class="fa-solid fa-volume-xmark"></i>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-slate-400">Cheklanganlar (Muted)</p>
+                <h4 class="text-xl font-bold text-white mt-0.5">{{ today_muted }}</h4>
+            </div>
+        </div>
+
+        <!-- Today Banned -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-xl border border-rose-500/20">
+                <i class="fa-solid fa-ban"></i>
+            </div>
+            <div>
+                <p class="text-xs font-medium text-slate-400">Chetlatilganlar (Banned)</p>
+                <h4 class="text-xl font-bold text-white mt-0.5">{{ today_banned }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart & Recent Activity Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 7 Days Trend Chart -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-line text-indigo-400"></i>
+                    <span>Oxirgi 7 kunlik reklamalar dinamikasi</span>
+                </h2>
+                <span class="text-xs text-slate-500">Avtomatik yangilanadi</span>
+            </div>
+            <div class="h-64">
+                <canvas id="adsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Spammers / Violators -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <h2 class="text-base font-bold text-white mb-4 flex items-center space-x-2">
+                <i class="fa-solid fa-skull-crossbones text-rose-400"></i>
+                <span>Eng ko‘p ogohlantirilganlar</span>
+            </h2>
+            <div class="space-y-3">
+                {% if top_offenders %}
+                    {% for user in top_offenders %}
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/50 border border-slate-800">
+                        <div class="flex items-center space-x-2.5 truncate">
+                            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                {{ loop.index }}
+                            </div>
+                            <div class="truncate">
+                                <p class="text-xs font-semibold text-white truncate">
+                                    {{ '@' + user.username if user.username else (user.first_name or 'ID: ' ~ user.telegram_id) }}
+                                </p>
+                                <p class="text-[10px] text-slate-500">ID: {{ user.telegram_id }}</p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30">
+                            {{ user.warnings_count }} ta
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-xs text-slate-500 text-center py-8">Qoidabuzarlar yo‘q.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Advertisements Table -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-clock text-amber-400"></i>
+                <span>Oxirgi aniqlangan reklamalar</span>
+            </h2>
+            <a href="/ads" class="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition">Barchasini ko‘rish &rarr;</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                        <th class="pb-3 font-medium">Vaqt</th>
+                        <th class="pb-3 font-medium">Foydalanuvchi</th>
+                        <th class="pb-3 font-medium">Guruh</th>
+                        <th class="pb-3 font-medium">Tur</th>
+                        <th class="pb-3 font-medium">Ball (Score)</th>
+                        <th class="pb-3 font-medium">Sabablar</th>
+                        <th class="pb-3 font-medium">Holat</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    {% if recent_ads %}
+                        {% for ad in recent_ads %}
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 text-slate-400 whitespace-nowrap">{{ ad.created_at.strftime('%d.%m %H:%M') }}</td>
+                            <td class="py-3 font-medium text-white whitespace-nowrap">
+                                {{ ad.user.first_name if ad.user else 'Noma\'lum' }}
+                                {% if ad.user and ad.user.username %}<span class="text-slate-500 text-[11px]">(@{{ ad.user.username }})</span>{% endif %}
+                            </td>
+                            <td class="py-3 text-slate-300 whitespace-nowrap">{{ ad.group.title if ad.group else '-' }}</td>
+                            <td class="py-3">
+                                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-[11px] font-mono">
+                                    {{ ad.message_type }}
+                                </span>
+                            </td>
+                            <td class="py-3">
+                                <span class="px-2 py-0.5 rounded text-xs font-bold {% if ad.score >= 70 %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% elif ad.score >= 40 %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% else %}bg-slate-800 text-slate-400{% endif %}">
+                                    {{ ad.score }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-slate-400 max-w-xs truncate">{{ ad.detection_reason }}</td>
+                            <td class="py-3 whitespace-nowrap">
+                                {% if ad.deleted %}
+                                <span class="text-emerald-400 font-medium"><i class="fa-solid fa-check text-[10px] mr-1"></i>O‘chirildi</span>
+                                {% else %}
+                                <span class="text-rose-400 font-medium"><i class="fa-solid fa-xmark text-[10px] mr-1"></i>O‘chmadi</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="py-6 text-center text-slate-500">Reklamalar topilmadi.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const chartData = {{ chart_data | tojson }};
+    const labels = chartData.map(item => item.date);
+    const counts = chartData.map(item => item.count);
+
+    const ctx = document.getElementById('adsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Aniqlangan reklamalar',
+                data: counts,
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.35,
+                pointBackgroundColor: '#818cf8',
+                pointBorderColor: '#fff',
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { size: 11 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { size: 11 }, stepSize: 1 }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

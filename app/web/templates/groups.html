@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Guruhlar - Defender Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Guruhlar Boshqaruvi</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Bot ulangan barcha Telegram guruhlari ro‘yxati</p>
+        </div>
+        <div class="text-sm bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300">
+            Jami: <strong class="text-white">{{ groups|length }}</strong> ta guruh
+        </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="pb-3 font-medium">ID</th>
+                        <th class="pb-3 font-medium">Guruh Nomi</th>
+                        <th class="pb-3 font-medium">Telegram Chat ID</th>
+                        <th class="pb-3 font-medium">Username</th>
+                        <th class="pb-3 font-medium">Holat</th>
+                        <th class="pb-3 font-medium">Qo‘shilgan sana</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60 text-xs sm:text-sm">
+                    {% if groups %}
+                        {% for g in groups %}
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 text-slate-500 font-mono">{{ g.id }}</td>
+                            <td class="py-3 font-semibold text-white">{{ g.title }}</td>
+                            <td class="py-3 text-slate-400 font-mono">{{ g.telegram_chat_id }}</td>
+                            <td class="py-3 text-slate-400">{{ '@' + g.username if g.username else '-' }}</td>
+                            <td class="py-3">
+                                {% if g.is_active %}
+                                <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                    Faol
+                                </span>
+                                {% else %}
+                                <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                    Nofaol
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-slate-500">{{ g.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="py-8 text-center text-slate-500">Guruhlar mavjud emas. Botni guruhga qo‘shing.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

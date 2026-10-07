@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="uz" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Defender Bot Admin{% endblock %}</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                </div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight text-white">Defender<span class="text-indigo-400">Bot</span></span>
+                    <span class="text-xs ml-2 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-medium border border-indigo-500/30">Admin Panel</span>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 text-sm text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Admin: <strong class="text-white">{{ current_admin.username if current_admin else 'Admin' }}</strong></span>
+                </div>
+                <a href="/logout" class="text-slate-400 hover:text-red-400 text-sm font-medium transition flex items-center space-x-1.5 bg-slate-800/50 hover:bg-red-500/10 px-3 py-1.5 rounded-lg border border-slate-700 hover:border-red-500/30">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    <span>Chiqish</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1 flex flex-col md:flex-row gap-6">
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 flex-shrink-0">
+            <nav class="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1 shadow-xl">
+                <a href="/" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'dashboard' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-gauge-high w-5 text-center"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/groups" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'groups' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-users-viewfinder w-5 text-center"></i>
+                    <span>Guruhlar</span>
+                </a>
+                <a href="/users" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'users' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-user-shield w-5 text-center"></i>
+                    <span>Foydalanuvchilar</span>
+                </a>
+                <a href="/ads" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'ads' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-rectangle-ad w-5 text-center"></i>
+                    <span>Reklamalar</span>
+                </a>
+                <a href="/warnings" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'warnings' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-triangle-exclamation w-5 text-center"></i>
+                    <span>Ogohlantirishlar</span>
+                </a>
+                <a href="/lists" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'lists' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-list-check w-5 text-center"></i>
+                    <span>Oq & Qora ro‘yxat</span>
+                </a>
+                <a href="/settings" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'settings' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-sliders w-5 text-center"></i>
+                    <span>Sozlamalar</span>
+                </a>
+                <a href="/logs" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl font-medium text-sm transition {% if active_page == 'logs' %}bg-indigo-600 text-white shadow-lg shadow-indigo-600/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-center"></i>
+                    <span>Audit Loglar</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-x-hidden">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+        <p>Defender Bot &copy; 2026. Barcha huquqlar himoyalangan.</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

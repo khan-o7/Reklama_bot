@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Reklamalar - Defender Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Aniqlangan Reklamalar</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Spam va reklama sababli o‘chirilgan xabarlar jurnali</p>
+        </div>
+        <div class="text-sm bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300">
+            Jami: <strong class="text-white">{{ ads|length }}</strong> ta reklama
+        </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+                <thead>
+                    <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="pb-3 font-medium">Vaqt</th>
+                        <th class="pb-3 font-medium">Guruh</th>
+                        <th class="pb-3 font-medium">Foydalanuvchi</th>
+                        <th class="pb-3 font-medium">Media turi</th>
+                        <th class="pb-3 font-medium">Ball</th>
+                        <th class="pb-3 font-medium">Sabab & Havolalar</th>
+                        <th class="pb-3 font-medium">Matn namunasi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    {% if ads %}
+                        {% for ad in ads %}
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 text-slate-500 whitespace-nowrap text-xs">{{ ad.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                            <td class="py-3 font-medium text-slate-300 whitespace-nowrap">{{ ad.group.title if ad.group else '-' }}</td>
+                            <td class="py-3 font-medium text-white whitespace-nowrap">
+                                {{ ad.user.first_name if ad.user else 'Noma\'lum' }}
+                                {% if ad.user and ad.user.username %}<span class="text-slate-500 text-xs">(@{{ ad.user.username }})</span>{% endif %}
+                            </td>
+                            <td class="py-3">
+                                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono">
+                                    {{ ad.message_type }}
+                                </span>
+                            </td>
+                            <td class="py-3">
+                                <span class="px-2.5 py-0.5 rounded text-xs font-bold {% if ad.score >= 70 %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                                    {{ ad.score }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-slate-300">
+                                <p class="text-xs font-medium text-amber-300/90">{{ ad.detection_reason }}</p>
+                                {% if ad.detected_links %}
+                                <p class="text-xs text-indigo-400 font-mono truncate max-w-xs mt-0.5">{{ ad.detected_links }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-slate-400 text-xs max-w-sm truncate">
+                                {{ ad.text or ad.caption or '<i>(Media kontent)</i>' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-slate-500">Hech qanday reklama aniqlanmagan.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="uz" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirish - Defender Bot Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full">
+        <!-- Logo Header -->
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 rounded-2xl bg-indigo-600 mx-auto flex items-center justify-center text-white shadow-xl shadow-indigo-500/30 mb-4">
+                <i class="fa-solid fa-shield-halved text-3xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Defender<span class="text-indigo-400">Bot</span></h1>
+            <p class="text-slate-400 text-sm mt-1">Admin boshqaruv paneliga kirish</p>
+        </div>
+
+        <!-- Login Form Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
+            {% if error %}
+            <div class="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center space-x-2">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <form action="/login" method="POST" class="space-y-5">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-slate-300 mb-1.5">Login (Username)</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            required
+                            placeholder="admin"
+                            class="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+                        >
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-slate-300 mb-1.5">Parol</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-500">
+                            <i class="fa-solid fa-lock"></i>
+                        </span>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            required
+                            placeholder="••••••••"
+                            class="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition text-sm"
+                        >
+                    </div>
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl shadow-lg shadow-indigo-600/30 transition duration-150 ease-in-out flex items-center justify-center space-x-2 text-sm mt-2"
+                >
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                    <span>Tizimga kirish</span>
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-xs text-slate-600 mt-6">
+            Defender Bot &copy; 2026. Xavfsiz avtorizatsiya.
+        </p>
+    </div>
+</body>
+</html>

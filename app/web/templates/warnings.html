@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Ogohlantirishlar - Defender Bot Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white">Ogohlantirishlar Jurnali</h1>
+            <p class="text-slate-400 text-sm mt-0.5">Foydalanuvchilarga yuborilgan ogohlantirishlar va jazo choralari</p>
+        </div>
+        <div class="text-sm bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300">
+            Jami: <strong class="text-white">{{ warnings|length }}</strong> ta ogohlantirish
+        </div>
+    </div>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm">
+                <thead>
+                    <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="pb-3 font-medium">Vaqt</th>
+                        <th class="pb-3 font-medium">Foydalanuvchi</th>
+                        <th class="pb-3 font-medium">Guruh</th>
+                        <th class="pb-3 font-medium">Qo‘llanilgan Chora</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800/60">
+                    {% if warnings %}
+                        {% for w in warnings %}
+                        <tr class="hover:bg-slate-800/30 transition">
+                            <td class="py-3 text-slate-500 whitespace-nowrap text-xs">{{ w.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                            <td class="py-3 font-medium text-white whitespace-nowrap">
+                                {{ w.user.first_name if w.user else 'Noma\'lum' }}
+                                {% if w.user and w.user.username %}<span class="text-slate-500 text-xs">(@{{ w.user.username }})</span>{% endif %}
+                            </td>
+                            <td class="py-3 text-slate-300 whitespace-nowrap">{{ w.group.title if w.group else '-' }}</td>
+                            <td class="py-3">
+                                <span class="px-2.5 py-1 rounded-lg text-xs font-semibold
+                                    {% if 'ban' in w.warning_type %}bg-rose-500/20 text-rose-300 border border-rose-500/30
+                                    {% elif 'mute' in w.warning_type %}bg-purple-500/20 text-purple-300 border border-purple-500/30
+                                    {% else %}bg-yellow-500/20 text-yellow-300 border border-yellow-500/30{% endif %}">
+                                    {{ w.warning_type }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="py-8 text-center text-slate-500">Hozircha ogohlantirishlar mavjud emas.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
