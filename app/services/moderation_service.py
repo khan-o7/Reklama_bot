@@ -142,7 +142,17 @@ class ModerationService:
         warning_enabled = group_settings.get("warning_enabled", "true").lower() == "true"
         del_sec = int(group_settings.get("warning_delete_seconds", str(settings.WARNING_DELETE_SECONDS)))
 
-        # 1. Attempt Message Deletion
+        logger.warning(f"Advertisement detected | user={user_id} | chat={chat_id} | score={analysis.get('score')}")
+
+        # 1. Notify Admins FIRST while original message is still accessible
+        await NotificationService.send_to_admins(
+            bot=bot,
+            message=message,
+            analysis=analysis,
+            deleted=True
+        )
+
+        # 2. Attempt Message Deletion from Group
         deleted_success = False
         if delete_ads:
             try:
@@ -158,9 +168,7 @@ class ModerationService:
             except (TelegramBadRequest, TelegramForbiddenError) as e:
                 logger.error(f"Failed to delete ad message {message.message_id} in chat {chat_id}: {e}")
 
-        logger.warning(f"Advertisement detected | user={user_id} | chat={chat_id} | score={analysis.get('score')}")
-
-        # 2. Record Advertisement in DB
+        # 3. Record Advertisement in DB
         raw_text = message.text or ""
         caption = message.caption or ""
         links_str = ", ".join(analysis.get("links", []))
@@ -177,14 +185,6 @@ class ModerationService:
             detected_links=links_str if links_str else None,
             score=analysis.get("score", 0),
             detection_reason=reasons_str,
-            deleted=deleted_success
-        )
-
-        # 3. Notify Admins
-        await NotificationService.send_to_admins(
-            bot=bot,
-            message=message,
-            analysis=analysis,
             deleted=deleted_success
         )
 
@@ -224,15 +224,16 @@ class ModerationService:
             warning_type=action_to_take
         )
 
-        # 7. Send Warning to User in Group
+        # 7. Send Otmetka Warning to User in Group
         if warning_enabled:
-            custom_warning_text = group_settings.get("warning_message", "")
-            user_mention = f'<a href="tg://user?id={user_id}">{user.first_name}</a>'
+            # Otmetka foydalanuvchini (username yoki nomini bosganda profil ochiladigan qilib)
+            user_mention = f"@{user.username}" if user.username else f'<a href="tg://user?id={user_id}">{user.full_name}</a>'
 
             warn_msg_content = (
-                f"{custom_warning_text}\n\n"
-                f"👤 <b>Foydalanuvchi:</b> {user_mention}\n"
-                f"⚠️ <b>Ogohlantirishlar soni:</b> {warnings_count}"
+                f"⚠️ <b>REKLAMA TAQIQLANGAN!</b>\n\n"
+                f"Hurmatli {user_mention}, guruhda reklama tarqatish taqiqlangan.\n"
+                f"Reklama yoki e’lon joylashtirish uchun <b>administratorga murojaat qiling!</b>\n\n"
+                f"📊 <i>Ogohlantirishlar soni: {warnings_count}</i>"
             )
             if penalty_text:
                 warn_msg_content += f"\n\n{penalty_text}"
