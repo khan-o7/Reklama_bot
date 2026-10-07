@@ -48,7 +48,7 @@ async def monitor_group_messages(message: Message, bot: Bot, session: AsyncSessi
     if not filter_admins:
         is_admin = await ModerationService.is_user_group_admin(bot, chat_id, user_id)
         if is_admin or user_id in settings.all_admin_ids:
-            # Skip checking admins
+            logger.info(f"🛡️ Admin xabari o‘tkazib yuborildi (admin imtiyozi) | user={user_id} (@{message.from_user.username or 'anon'})")
             return
 
     # 3. Synchronize Whitelist & Blacklist cache if TTL expired
@@ -68,6 +68,11 @@ async def monitor_group_messages(message: Message, bot: Bot, session: AsyncSessi
         blacklist_domains=cache.get_blacklist_domains(),
         blacklist_usernames=cache.get_blacklist_usernames(),
         threshold=threshold
+    )
+
+    logger.info(
+        f"🔍 Xabar tahlili | user={user_id} | score={analysis['score']}/{threshold} | "
+        f"is_ad={analysis['is_ad']} | sabablar={analysis.get('reasons')}"
     )
 
     # 6. If detected as ad, execute moderation workflow
