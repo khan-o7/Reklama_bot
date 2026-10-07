@@ -147,3 +147,23 @@ def test_combination_vs_casual():
     res_combo = AdvertisementDetector.analyze_message(msg_combo)
     assert res_combo["is_ad"] is True
     assert res_combo["score"] >= 80
+
+
+def test_dataset_lexicon_phrases():
+    # Test commercial phrase combinations from advertising_keywords.json
+    msg1 = create_mock_message(text="Sotuvda mavjud bo'lgan mahsulotlar uchun admin ga murojaat qiling")
+    res1 = AdvertisementDetector.analyze_message(msg1)
+    assert res1["is_ad"] is True
+    assert res1["score"] >= 40
+
+    # Test crypto signal from dataset
+    msg2 = create_mock_message(text="Trading signals and guaranteed profit for all crypto users")
+    res2 = AdvertisementDetector.analyze_message(msg2)
+    assert res2["is_ad"] is True
+    assert res2["score"] >= 40
+
+    # Test Cyrillic Uzbek phrase from dataset
+    msg3 = create_mock_message(text="Маҳсулот сотамиз, буюртма қилинг ва чегирма билан олинг")
+    res3 = AdvertisementDetector.analyze_message(msg3)
+    assert res3["is_ad"] is True
+    assert res3["score"] >= 40

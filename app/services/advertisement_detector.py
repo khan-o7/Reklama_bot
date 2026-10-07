@@ -1,3 +1,5 @@
+import os
+import json
 import re
 from typing import Dict, Any, List, Set, Optional
 from aiogram.types import Message
@@ -12,15 +14,15 @@ class AdvertisementDetector:
     """
     Production-grade Multi-Factor Advertisement Detection Engine.
     
-    Categorized Lexicon (Uzbek 🇺🇿, Russian 🇷🇺, English 🇬🇧):
-    - Sales & Commercial Offers (Sotuv / Taklif / Продажа / Sales)
-    - Call to Action (CTA / Harakatga chaqirish / CTA)
-    - Contact Indicators (Kontakt / Контакт / Contact)
-    - Multi-Factor Synergy & Combination Signals
-    - False-Positive Safeguards & Whitelist / Blacklist integration
+    Dynamically powered by the 2,600+ multilingual dataset in app/data/advertising_keywords.json:
+    - Uzbek Latin, Uzbek Cyrillic, Russian, and English terms/phrases.
+    - Categories: business_services, commercial_phrase, cta_contact, discount_price, education,
+      finance_crypto, income_jobs, marketing_ads, sales, telegram_links.
+    - Multi-Factor Synergy & Combination Signals.
+    - False-Positive Safeguards & Whitelist / Blacklist integration.
     """
 
-    # 1. High-impact direct advertising signals (immediate 35-40 points)
+    # Base high-impact phrases (extended dynamically from JSON dataset)
     HIGH_IMPACT_PHRASES: Dict[str, int] = {
         # Uzbek
         "reklama": 40,
@@ -218,6 +220,63 @@ class AdvertisementDetector:
     MENTION_SCORE = 20
     DEFAULT_THRESHOLD = 40
 
+    _DATASET_LOADED: bool = False
+    DISCOUNT_TERMS: Dict[str, int] = {}
+    BUSINESS_SERVICE_TERMS: Dict[str, int] = {}
+    EDUCATION_TERMS: Dict[str, int] = {}
+    CRYPTO_FINANCE_TERMS: Dict[str, int] = {}
+    INCOME_JOB_TERMS: Dict[str, int] = {}
+
+    @classmethod
+    def _ensure_lexicon_loaded(cls) -> None:
+        """Loads and compiles terms from app/data/advertising_keywords.json cleanly."""
+        if cls._DATASET_LOADED:
+            return
+        
+        try:
+            current_dir = os.path.dirname(__file__)
+            data_file = os.path.join(current_dir, "..", "data", "advertising_keywords.json")
+            if os.path.exists(data_file):
+                with open(data_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for item in data.get("entries", []):
+                        raw_term = item.get("term", "").strip()
+                        term = cyrillic_to_latin(raw_term).lower()
+                        cat = item.get("category", "")
+                        score = item.get("score", 2)
+                        if not term:
+                            continue
+                        
+                        if cat in ("marketing_ads", "telegram_links"):
+                            if term not in cls.HIGH_IMPACT_PHRASES:
+                                cls.HIGH_IMPACT_PHRASES[term] = score * 8
+                        elif cat in ("sales", "commercial_phrase", "commercial_variant"):
+                            if term not in cls.HIGH_IMPACT_PHRASES and term not in cls.SALES_TERMS:
+                                cls.SALES_TERMS[term] = score * 5
+                        elif cat == "cta_contact":
+                            if term not in cls.HIGH_IMPACT_PHRASES and term not in cls.CTA_TERMS and term not in cls.CONTACT_TERMS:
+                                cls.CTA_TERMS[term] = score * 5
+                                cls.CONTACT_TERMS[term] = score * 4
+                        elif cat == "discount_price":
+                            if term not in cls.SALES_TERMS and term not in cls.HIGH_IMPACT_PHRASES and term not in cls.DISCOUNT_TERMS:
+                                cls.DISCOUNT_TERMS[term] = score * 4
+                        elif cat == "education":
+                            if term not in cls.EDUCATION_TERMS and term not in cls.HIGH_IMPACT_PHRASES:
+                                cls.EDUCATION_TERMS[term] = score * 5
+                        elif cat == "finance_crypto":
+                            if term not in cls.CRYPTO_FINANCE_TERMS:
+                                cls.CRYPTO_FINANCE_TERMS[term] = score * 8
+                        elif cat == "income_jobs":
+                            if term not in cls.INCOME_JOB_TERMS and term not in cls.HIGH_IMPACT_PHRASES:
+                                cls.INCOME_JOB_TERMS[term] = score * 6
+                        elif cat == "business_services":
+                            if term not in cls.BUSINESS_SERVICE_TERMS and term not in cls.HIGH_IMPACT_PHRASES:
+                                cls.BUSINESS_SERVICE_TERMS[term] = score * 5
+        except Exception as e:
+            logger.warning(f"Could not load advertising_keywords.json: {e}")
+        finally:
+            cls._DATASET_LOADED = True
+
     @classmethod
     def get_message_content_and_type(cls, message: Message) -> tuple[str, str]:
         """Extracts text or caption and identifies message content type."""
@@ -395,15 +454,23 @@ class AdvertisementDetector:
             score += cls.PHONE_SCORE
             reasons.append("phone_number")
 
+        # Ensure 2,600+ JSON lexicon entries are loaded
+        cls._ensure_lexicon_loaded()
+
         # -------------------------------------------------------------
-        # STEP 5: CATEGORIZED KEYWORDS INSPECTION
+        # STEP 5: CATEGORIZED KEYWORDS & PHRASES INSPECTION
         # -------------------------------------------------------------
         found_high_impact: Set[str] = set()
         found_sales: Set[str] = set()
         found_cta: Set[str] = set()
         found_contact: Set[str] = set()
+        found_discount: Set[str] = set()
+        found_crypto: Set[str] = set()
+        found_income: Set[str] = set()
+        found_education: Set[str] = set()
+        found_business: Set[str] = set()
 
-        # A. High Impact Phrases
+        # A. High Impact Phrases (Marketing & Channel Advertising)
         for phrase, weight in cls.HIGH_IMPACT_PHRASES.items():
             phrase_clean = cyrillic_to_latin(phrase).lower()
             pattern = re.compile(rf'\b{re.escape(phrase_clean)}\b', re.IGNORECASE)
@@ -435,22 +502,71 @@ class AdvertisementDetector:
                 score += weight
                 found_contact.add(term)
 
-        # E. Numerical Discount & Price Patterns
-        discount_pattern = re.compile(r'\b\d+\s*%\s*(chegirma|skidka|skidk|off|discount|aksiya|aktsiya|sale)\b', re.IGNORECASE)
+        # E. Discount & Price Terms
+        for term, weight in cls.DISCOUNT_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_discount.add(term)
+
+        # F. Crypto & High Risk Finance Terms
+        for term, weight in cls.CRYPTO_FINANCE_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_crypto.add(term)
+
+        # G. Income & Remote Job Terms
+        for term, weight in cls.INCOME_JOB_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_income.add(term)
+
+        # H. Course & Education Terms
+        for term, weight in cls.EDUCATION_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_education.add(term)
+
+        # I. Business Services Terms
+        for term, weight in cls.BUSINESS_SERVICE_TERMS.items():
+            term_clean = cyrillic_to_latin(term).lower()
+            pattern = re.compile(rf'\b{re.escape(term_clean)}\b', re.IGNORECASE)
+            if pattern.search(latin_text):
+                score += weight
+                found_business.add(term)
+
+        # J. Numerical Discount & Price Currency Patterns
+        discount_pattern = re.compile(r'\b\d+\s*%\s*(chegirma|skidka|skidk|off|discount|aksiya|aktsiya|sale|foiz|protsent|процент)\b', re.IGNORECASE)
         has_discount_percent = bool(discount_pattern.search(latin_text))
         if has_discount_percent:
             score += 25
             reasons.append("discount_percentage_pattern")
 
-        all_detected_kws = found_high_impact | found_sales | found_cta | found_contact
+        currency_pattern = re.compile(r'(?i)(?:\$|€|£|₽|so[\'’`ʻ]m|сум|руб\.?|usd|eur|rub)\s*\d+(?:[.,]\d+)?|\b\d+(?:[.,]\d+)?\s*(?:so[\'’`ʻ]m|сум|руб\.?|usd|eur|rub)\b')
+        has_price_currency = bool(currency_pattern.search(raw_text))
+        if has_price_currency:
+            score += 20
+            reasons.append("price_currency_pattern")
+
+        all_detected_kws = (
+            found_high_impact | found_sales | found_cta | found_contact |
+            found_discount | found_crypto | found_income | found_education | found_business
+        )
         if all_detected_kws:
-            reasons.append(f"keywords: {', '.join(sorted(all_detected_kws))}")
+            reasons.append(f"keywords: {', '.join(sorted(all_detected_kws)[:15])}")
 
         # -------------------------------------------------------------
         # STEP 6: MULTI-FACTOR COMBINATION SYNERGY (Kombinatsiyalar)
         # -------------------------------------------------------------
-        has_sales = bool(found_sales or found_high_impact or has_discount_percent)
-        has_cta = bool(found_cta)
+        has_sales = bool(found_sales or found_high_impact or found_discount or found_crypto or found_income or has_discount_percent or has_price_currency)
+        has_cta = bool(found_cta or found_education or found_business)
         has_contact = bool(found_contact or has_phone or has_mention)
 
         # Combination 1: (Sales + CTA)
