@@ -110,10 +110,29 @@ class ModerationService:
         8. Audit logging
         """
         user = message.from_user
+        chat_id = message.chat.id
+
+        # Channel post handling (no individual user)
         if not user:
+            group_db = await GroupRepository.get_or_create(
+                session=session,
+                telegram_chat_id=chat_id,
+                title=message.chat.title or "Kanal",
+                username=message.chat.username
+            )
+            await NotificationService.send_to_admins(
+                bot=bot,
+                message=message,
+                analysis=analysis,
+                deleted=True
+            )
+            try:
+                await message.delete()
+                logger.warning(f"Channel advertisement deleted | chat={chat_id} msg={message.message_id}")
+            except Exception as e:
+                logger.error(f"Failed to delete channel ad message {message.message_id} in {chat_id}: {e}")
             return
 
-        chat_id = message.chat.id
         user_id = user.id
 
         # Fetch or register group

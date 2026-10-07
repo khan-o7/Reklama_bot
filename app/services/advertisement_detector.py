@@ -352,7 +352,8 @@ class AdvertisementDetector:
         blacklist_words: Optional[Set[str]] = None,
         blacklist_domains: Optional[Set[str]] = None,
         blacklist_usernames: Optional[Set[str]] = None,
-        threshold: int = DEFAULT_THRESHOLD
+        threshold: int = DEFAULT_THRESHOLD,
+        custom_text: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Analyzes a Telegram message for commercial advertisements using
@@ -364,6 +365,9 @@ class AdvertisementDetector:
         blacklist_usernames = blacklist_usernames or set()
 
         raw_text, msg_type = cls.get_message_content_and_type(message)
+        if custom_text is not None:
+            raw_text = custom_text
+
         normalized = normalize_text(raw_text)
         latin_text = cyrillic_to_latin(normalized)
 
@@ -605,5 +609,7 @@ class AdvertisementDetector:
             "links": all_links,
             "phones": phones,
             "mentions": all_mentions,
-            "message_type": msg_type
+            "message_type": msg_type,
+            "raw_text": raw_text,
+            "matched_keywords": sorted(all_detected_kws) if 'all_detected_kws' in locals() else []
         }

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     AUTO_BAN: bool = Field(default=True, description="Enable automatic ban escalation")
     FILTER_ADMINS: bool = Field(default=False, description="Whether to filter group admins too")
 
+    # OCR Settings
+    OCR_ENABLED: bool = Field(default=True, description="Enable image OCR detection for photos")
+    TESSERACT_CMD: str = Field(default="", description="Path to tesseract executable if not in PATH")
+
     # Escalation Actions
     FIRST_ACTION: str = Field(default="warning", description="Action for 1st offense (warning)")
     SECOND_ACTION: str = Field(default="mute_10m", description="Action for 2nd offense")
