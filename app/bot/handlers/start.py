@@ -1,17 +1,30 @@
 from aiogram import Router
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.filters import CommandStart, Command, CommandObject
+from aiogram.types import (
+    Message,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.database.repositories.user_repo import UserRepository
 from app.bot.keyboards.admin_kb import get_admin_main_menu
+from app.bot.handlers.ad_order import start_ad_order_workflow
 
 router = Router(name="start_router")
 
 
 @router.message(CommandStart())
-async def handle_start(message: Message, session: AsyncSession) -> None:
+async def handle_start(
+    message: Message,
+    session: AsyncSession,
+    state: FSMContext,
+    command: CommandObject = None
+) -> None:
     user = message.from_user
     if not user:
         return
@@ -29,6 +42,11 @@ async def handle_start(message: Message, session: AsyncSession) -> None:
     )
 
     if message.chat.type == "private":
+        # Check if opened via deep link for ad order: /start ad_order
+        if command and command.args == "ad_order":
+            await start_ad_order_workflow(message, state)
+            return
+
         if is_admin:
             text = (
                 f"Assalomu alaykum, <b>{user.first_name}</b>!\n\n"
@@ -39,11 +57,22 @@ async def handle_start(message: Message, session: AsyncSession) -> None:
         else:
             text = (
                 f"Assalomu alaykum, <b>{user.first_name}</b>!\n\n"
-                f"🤖 Men Telegram guruhlarini reklamalar, spam va keraksiz havolalardan "
-                f"himoya qiluvchi professional <b>Defender Bot</b>man.\n\n"
-                f"Meni guruhingizga qo‘shing va <b>Administrator</b> qilib tayinlang!"
+                f"🤖 Men Telegram guruhlarini reklamalar va spamdan himoya qiluvchi "
+                f"hamda rasmiy reklama xizmatlarini qabul qiluvchi <b>Defender Bot</b>man.\n\n"
+                f"📢 Guruh yoki platformalarda reklama joylashtirmoqchi bo‘lsangiz, "
+                f"quyidagi <b>«📢 Reklama berish»</b> tugmasini bosing:"
             )
-            await message.answer(text, parse_mode="HTML")
+            user_reply_kb = ReplyKeyboardMarkup(
+                keyboard=[[KeyboardButton(text="📢 Reklama berish")]],
+                resize_keyboard=True
+            )
+            user_inline_kb = InlineKeyboardMarkup(
+                inline_keyboard=[[
+                    InlineKeyboardButton(text="📢 Reklama berish", callback_data="start_ad_order")
+                ]]
+            )
+            await message.answer(text, parse_mode="HTML", reply_markup=user_reply_kb)
+            await message.answer("Tanlang:", reply_markup=user_inline_kb)
     else:
         # In groups
         await message.answer(

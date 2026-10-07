@@ -231,19 +231,19 @@ class ModerationService:
 
             warn_msg_content = (
                 f"⚠️ <b>REKLAMA TAQIQLANGAN!</b>\n\n"
-                f"Hurmatli {user_mention}, guruhda reklama tarqatish taqiqlangan.\n"
-                f"Reklama yoki e’lon joylashtirish uchun <b>administratorga murojaat qiling!</b>\n\n"
+                f"Hurmatli {user_mention}, reklama uchun <b>botga murojaat qiling!</b>\n\n"
                 f"📊 <i>Ogohlantirishlar soni: {warnings_count}</i>"
             )
             if penalty_text:
                 warn_msg_content += f"\n\n{penalty_text}"
 
             try:
+                bot_user = await bot.get_me()
                 sent_warning = await bot.send_message(
                     chat_id=chat_id,
                     text=warn_msg_content,
                     parse_mode="HTML",
-                    reply_markup=get_warning_keyboard()
+                    reply_markup=get_warning_keyboard(bot_username=bot_user.username)
                 )
                 # Auto-delete warning message after N seconds
                 if del_sec > 0:

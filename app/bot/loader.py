@@ -8,6 +8,7 @@ from app.bot.middlewares.db_middleware import DatabaseMiddleware
 from app.bot.middlewares.throttling_middleware import ThrottlingMiddleware
 from app.bot.handlers import (
     start_router,
+    ad_order_router,
     admin_router,
     group_events_router,
     moderation_router,
@@ -31,6 +32,7 @@ def create_dispatcher() -> Dispatcher:
 
     # Routers registration (order matters: command routers first, generic moderation handler last)
     dp.include_router(start_router)
+    dp.include_router(ad_order_router)
     dp.include_router(admin_router)
     dp.include_router(group_events_router)
     dp.include_router(moderation_router)

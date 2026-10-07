@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     )
     ADMINS: Union[str, List[int]] = Field(default="", description="Comma-separated Telegram IDs of admins")
     ADMIN_USERNAME: str = Field(default="admin", description="Username of admin for contact buttons")
+    AD_PAYMENT_CARD: str = Field(default="5614683515901387", description="Card number for ad payments")
 
     # Database
     DATABASE_URL: str = Field(
