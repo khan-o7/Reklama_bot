@@ -50,11 +50,20 @@ async def main():
     bot: Bot = create_bot()
     dp: Dispatcher = create_dispatcher()
 
-    # Drop any pending updates before polling
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Robust Telegram connection with retry for Windows / transient network hiccups
+    for attempt in range(1, 11):
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            bot_info = await bot.get_me()
+            logger.info(f"Bot started | @{bot_info.username} (ID: {bot_info.id})")
+            break
+        except Exception as conn_err:
+            if attempt == 10:
+                logger.critical(f"Failed to connect to Telegram API after 10 attempts: {conn_err}")
+                raise
+            logger.warning(f"Telegram connection attempt {attempt}/10 failed ({conn_err}). Retrying in 2 seconds...")
+            await asyncio.sleep(2)
 
-    bot_info = await bot.get_me()
-    logger.info(f"Bot started | @{bot_info.username} (ID: {bot_info.id})")
     if settings.WEB_ADMIN_ENABLED:
         logger.info(f"Web Admin Panel available at: http://localhost:{settings.WEB_ADMIN_PORT}")
 
