@@ -3,7 +3,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 from aiogram import Bot
 from aiogram.types import Message, ChatPermissions
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramRetryAfter,
+    TelegramNetworkError,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
@@ -84,10 +89,14 @@ class ModerationService:
                 action_desc = "🔇 <b>24 soat yozishdan cheklash (MUTE) qo‘llanildi.</b>"
             elif action == "ban":
                 await bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-                action_desc = "🚫 <b>Foydalanuvchi guruhdan chetlatildi (BAN).</b>"
         except (TelegramBadRequest, TelegramForbiddenError) as e:
-            logger.error(f"Cannot execute penalty action {action} for user {user_id} in {chat_id}: {e}")
-            action_desc = "⚠️ <i>(Botda foydalanuvchini jazolash huquqi yetarli emas)</i>"
+            err_msg = str(e).lower()
+            if "can't remove chat owner" in err_msg or "chat owner" in err_msg:
+                logger.info(f"Foydalanuvchi {user_id} guruh egasi (creator), unga jazo qo‘llanmaydi, faqat reklama o‘chirildi.")
+                action_desc = "👑 <i>(Guruh egasiga cheklov qo‘llanmaydi)</i>"
+            else:
+                logger.error(f"Cannot execute penalty action {action} for user {user_id} in {chat_id}: {e}")
+                action_desc = "⚠️ <i>(Botda foydalanuvchini jazolash huquqi yetarli emas)</i>"
 
         return action_desc
 
@@ -120,17 +129,33 @@ class ModerationService:
                 title=message.chat.title or "Kanal",
                 username=message.chat.username
             )
-            await NotificationService.send_to_admins(
-                bot=bot,
-                message=message,
-                analysis=analysis,
-                deleted=True
+            deleted_success = False
+            for del_attempt in range(1, 4):
+                try:
+                    await message.delete()
+                    deleted_success = True
+                    logger.warning(f"Channel advertisement deleted | chat={chat_id} msg={message.message_id}")
+                    break
+                except TelegramRetryAfter as e:
+                    await asyncio.sleep(e.retry_after)
+                except TelegramNetworkError as net_err:
+                    logger.warning(f"Kanal xabarini o‘chirishda tarmoq xatosi ({del_attempt}/3): {net_err}")
+                    await asyncio.sleep(1)
+                except (TelegramBadRequest, TelegramForbiddenError) as e:
+                    logger.error(f"Failed to delete channel ad message {message.message_id} in {chat_id}: {e}")
+                    break
+                except Exception as e:
+                    logger.error(f"Unexpected error deleting channel ad message {message.message_id} in {chat_id}: {e}")
+                    break
+
+            asyncio.create_task(
+                NotificationService.send_to_admins(
+                    bot=bot,
+                    message=message,
+                    analysis=analysis,
+                    deleted=deleted_success
+                )
             )
-            try:
-                await message.delete()
-                logger.warning(f"Channel advertisement deleted | chat={chat_id} msg={message.message_id}")
-            except Exception as e:
-                logger.error(f"Failed to delete channel ad message {message.message_id} in {chat_id}: {e}")
             return
 
         user_id = user.id
@@ -163,29 +188,37 @@ class ModerationService:
 
         logger.warning(f"Advertisement detected | user={user_id} | chat={chat_id} | score={analysis.get('score')}")
 
-        # 1. Notify Admins FIRST while original message is still accessible
-        await NotificationService.send_to_admins(
-            bot=bot,
-            message=message,
-            analysis=analysis,
-            deleted=True
-        )
-
-        # 2. Attempt Message Deletion from Group
+        # 1. IMMEDIATE Message Deletion from Group (Top Priority!)
         deleted_success = False
         if delete_ads:
-            try:
-                await message.delete()
-                deleted_success = True
-            except TelegramRetryAfter as e:
-                await asyncio.sleep(e.retry_after)
+            for del_attempt in range(1, 4):
                 try:
                     await message.delete()
                     deleted_success = True
-                except Exception:
-                    pass
-            except (TelegramBadRequest, TelegramForbiddenError) as e:
-                logger.error(f"Failed to delete ad message {message.message_id} in chat {chat_id}: {e}")
+                    logger.info(f"🗑️ Reklama xabari guruhdan o‘chirildi | chat={chat_id} msg={message.message_id}")
+                    break
+                except TelegramRetryAfter as e:
+                    logger.warning(f"Telegram flood limit: {e.retry_after}s kutilmoqda...")
+                    await asyncio.sleep(e.retry_after)
+                except TelegramNetworkError as net_err:
+                    logger.warning(f"Tarmoq uzilishi tufayli xabarni o‘chirishda urinish {del_attempt}/3 ({net_err}). Qayta urinilmoqda...")
+                    await asyncio.sleep(1)
+                except (TelegramBadRequest, TelegramForbiddenError) as e:
+                    logger.error(f"Failed to delete ad message {message.message_id} in chat {chat_id}: {e}")
+                    break
+                except Exception as e:
+                    logger.error(f"Kutilmagan xatolik tufayli xabar o‘chirilmadi: {e}")
+                    break
+
+        # 2. Asynchronous Admin Notification (Does NOT block or abort moderation)
+        asyncio.create_task(
+            NotificationService.send_to_admins(
+                bot=bot,
+                message=message,
+                analysis=analysis,
+                deleted=deleted_success
+            )
+        )
 
         # 3. Record Advertisement in DB
         raw_text = message.text or ""
