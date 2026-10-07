@@ -86,8 +86,8 @@ async def main():
 
 if __name__ == "__main__":
     if sys.platform == "win32":
-        # ProactorEventLoop is standard on Python 3.8+ Windows
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        # WindowsSelectorEventLoopPolicy eliminates WinError 52 and socket IOCP issues with aiohttp
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
