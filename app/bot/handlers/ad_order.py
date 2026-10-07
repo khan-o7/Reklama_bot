@@ -24,9 +24,13 @@ class AdOrderStates(StatesGroup):
 async def start_ad_order_workflow(message: Message, state: FSMContext) -> None:
     """Entry point for initiating the advertisement ordering flow."""
     await state.set_state(AdOrderStates.waiting_for_ad_content)
+    price = settings.AD_PRICE
+    card_number = settings.AD_PAYMENT_CARD
     text = (
         "📢 <b>Reklama joylashtirish xizmati</b>\n\n"
-        "Guruh va platformalarda reklama bermoqchi bo‘lsangiz, iltimos, reklama ma’lumotlarini yuboring:\n"
+        f"💰 <b>Xizmat narxi:</b> <b>{price}</b>\n"
+        f"💳 <b>To‘lov kartasi:</b> <code>{card_number}</code>\n\n"
+        "Guruhda reklama joylashtirmoqchi bo‘lsangiz, iltimos, reklama ma’lumotlarini yuboring:\n"
         "• Reklama matni (tavsif, narx, telefon va h.k.)\n"
         "• Rasm yoki video (mavjud bo‘lsa)\n"
         "• Kanal/guruh yoki sayt havolalari\n\n"
@@ -83,6 +87,7 @@ async def process_ad_content(message: Message, bot: Bot, state: FSMContext) -> N
         f"📢 <b>YANGI REKLAMA BUYURTMASI KELDI!</b>\n\n"
         f"👤 <b>Foydalanuvchi:</b> {user.full_name} ({username_str})\n"
         f"🆔 <b>User ID:</b> <code>{user.id}</code>\n"
+        f"💰 <b>Narx:</b> {settings.AD_PRICE}\n"
         f"📅 <b>Vaqt:</b> {now_str}\n\n"
         f"Quyida yuborilgan reklama ma’lumotlari:"
     )
@@ -104,9 +109,13 @@ async def process_ad_content(message: Message, bot: Bot, state: FSMContext) -> N
 
     # 3. Inform user with payment instructions
     card_number = settings.AD_PAYMENT_CARD
+    price = settings.AD_PRICE
     response_to_user = (
-        f"To'lovni ushbu <code>{card_number}</code> kartaga tashlang hamda skrinshot yuboring "
-        f"admin tomonidan tasdiqlangach reklama malumotlari guruhda, olxda avtomatik qo'yib boriladi."
+        f"✅ <b>Reklama ma’lumotlaringiz qabul qilindi!</b>\n\n"
+        f"💰 <b>To‘lov miqdori:</b> <b>{price}</b>\n"
+        f"💳 <b>To‘lov kartasi:</b> <code>{card_number}</code>\n\n"
+        f"To‘lovni ushbu kartaga o‘tkazib, chek <b>skrinshotini (rasmini)</b> yuboring. "
+        f"Admin tomonidan tasdiqlangach, reklama ma’lumotlari guruhda avtomatik e’lon qilinadi."
     )
     cancel_kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -238,3 +247,49 @@ async def handle_ad_reject(callback: CallbackQuery, bot: Bot) -> None:
         )
     except Exception as e:
         logger.error(f"Foydalanuvchiga rad etish xabarini jo'natishda xatolik ({user_id}): {e}")
+
+
+@router.message(F.text.casefold().in_(["tasdiqlandi", "tasdiq", "tasdiqlayman", "ok", "to'lov tasdiqlandi", "tolov tasdiqlandi"]))
+async def handle_admin_text_approval(message: Message, bot: Bot) -> None:
+    """
+    Allows admin to reply with text 'tasdiqlandi' to a receipt/order message
+    to approve the advertisement payment and notify the user.
+    """
+    if not message.from_user or message.from_user.id not in settings.all_admin_ids:
+        return
+
+    reply_to = message.reply_to_message
+    if not reply_to:
+        await message.reply(
+            "ℹ️ To‘lovni matn orqali tasdiqlash uchun bot yuborgan chek xabariga <b>Reply (Javob)</b> qilib "
+            "<code>tasdiqlandi</code> deb yozing yoki chek ostidagi <b>[To‘lovni tasdiqlash]</b> tugmasini bosing.",
+            parse_mode="HTML"
+        )
+        return
+
+    import re
+    search_text = f"{reply_to.text or ''} {reply_to.caption or ''}"
+    match = re.search(r'(?:User|Mijoz|Foydalanuvchi)\s*ID:?\s*<code>?(\d+)</code>?', search_text, re.IGNORECASE)
+
+    if not match:
+        await message.reply("⚠️ Ushbu xabardan mijoz ID topilmadi. Iltimos, xabar ostidagi tugmani bosing.")
+        return
+
+    user_id = int(match.group(1))
+    await message.reply(
+        f"✅ <b>To‘lov tasdiqlandi!</b> Mijoz (ID: <code>{user_id}</code>) ga tasdiqlash xabari jo‘natildi.",
+        parse_mode="HTML"
+    )
+
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=(
+                "🎉 <b>XUSHXABAR! To‘lovingiz tasdiqlandi!</b>\n\n"
+                "Siz yuborgan reklama to‘lovi administrator tomonidan <b>tasdiqlandi!</b>\n"
+                "Reklamangiz guruhda e’lon qilinadi. Hamkorlik uchun rahmat!"
+            ),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Foydalanuvchiga tasdiq xabarini jo'natishda xatolik ({user_id}): {e}")
