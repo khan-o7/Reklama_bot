@@ -68,7 +68,12 @@ async def main():
         logger.info(f"Web Admin Panel available at: http://localhost:{settings.WEB_ADMIN_PORT}")
 
     tasks = [
-        dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+        dp.start_polling(
+            bot,
+            allowed_updates=dp.resolve_used_update_types(),
+            polling_timeout=30,
+            handle_as_tasks=True
+        )
     ]
 
     if settings.WEB_ADMIN_ENABLED:
