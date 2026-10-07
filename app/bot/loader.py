@@ -17,9 +17,20 @@ from app.bot.handlers import (
 )
 
 
+class WindowsSafeAiohttpSession(AiohttpSession):
+    """
+    Enforces IPv4 (socket.AF_INET) to prevent Windows WinError 52 / NetBIOS collisions,
+    while maintaining HTTP Keep-Alive connection pooling (no port exhaustion).
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connector_init["family"] = socket.AF_INET
+
+
 def create_bot() -> Bot:
     return Bot(
         token=settings.BOT_TOKEN,
+        session=WindowsSafeAiohttpSession(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
