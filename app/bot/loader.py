@@ -17,24 +17,9 @@ from app.bot.handlers import (
 )
 
 
-class WindowsSafeAiohttpSession(AiohttpSession):
-    """
-    Custom AiohttpSession configured for stable Windows & cross-platform socket behavior:
-    - Enforces IPv4 (socket.AF_INET) to prevent WinError 52 / NetBIOS collisions.
-    - Uses persistent TCP connection pooling (keepalive) to prevent socket port exhaustion (Errno 10048).
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._connector_init["family"] = socket.AF_INET
-        self._connector_init["limit"] = 100
-        self._connector_init["ttl_dns_cache"] = 300
-
-
 def create_bot() -> Bot:
-    session = WindowsSafeAiohttpSession()
     return Bot(
         token=settings.BOT_TOKEN,
-        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
