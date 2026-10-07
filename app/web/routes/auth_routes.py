@@ -12,7 +12,7 @@ templates = Jinja2Templates(directory="app/web/templates")
 
 @router.get("/login", response_class=responses.HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
 
 
 @router.post("/login")
@@ -25,8 +25,9 @@ async def login_action(
     admin_user = await AdminUserRepository.get_by_username(session, username)
     if not admin_user or not verify_password(password, admin_user.password_hash):
         return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Login yoki parol noto‘g‘ri!"},
+            request=request,
+            name="login.html",
+            context={"error": "Login yoki parol noto‘g‘ri!"},
             status_code=status.HTTP_400_BAD_REQUEST
         )
 

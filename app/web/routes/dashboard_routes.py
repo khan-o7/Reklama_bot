@@ -36,9 +36,9 @@ async def dashboard_page(
     recent_ads = await AdvertisementRepository.get_recent(session, limit=10)
 
     return templates.TemplateResponse(
-        "dashboard.html",
-        {
-            "request": request,
+        request=request,
+        name="dashboard.html",
+        context={
             "current_admin": current_admin,
             "active_page": "dashboard",
             "total_groups": total_groups,
@@ -63,9 +63,9 @@ async def groups_page(
 ):
     groups = await GroupRepository.get_all(session, limit=100)
     return templates.TemplateResponse(
-        "groups.html",
-        {
-            "request": request,
+        request=request,
+        name="groups.html",
+        context={
             "current_admin": current_admin,
             "active_page": "groups",
             "groups": groups,
@@ -81,9 +81,9 @@ async def users_page(
 ):
     users = await UserRepository.get_recent_users(session, limit=100)
     return templates.TemplateResponse(
-        "users.html",
-        {
-            "request": request,
+        request=request,
+        name="users.html",
+        context={
             "current_admin": current_admin,
             "active_page": "users",
             "users": users,
@@ -99,9 +99,9 @@ async def ads_page(
 ):
     ads = await AdvertisementRepository.get_recent(session, limit=100)
     return templates.TemplateResponse(
-        "ads.html",
-        {
-            "request": request,
+        request=request,
+        name="ads.html",
+        context={
             "current_admin": current_admin,
             "active_page": "ads",
             "ads": ads,
@@ -117,9 +117,9 @@ async def warnings_page(
 ):
     warnings = await WarningRepository.get_recent(session, limit=100)
     return templates.TemplateResponse(
-        "warnings.html",
-        {
-            "request": request,
+        request=request,
+        name="warnings.html",
+        context={
             "current_admin": current_admin,
             "active_page": "warnings",
             "warnings": warnings,
@@ -136,9 +136,9 @@ async def lists_page(
     whitelist = await ListRepository.get_all_whitelist(session)
     blacklist = await ListRepository.get_all_blacklist(session)
     return templates.TemplateResponse(
-        "lists.html",
-        {
-            "request": request,
+        request=request,
+        name="lists.html",
+        context={
             "current_admin": current_admin,
             "active_page": "lists",
             "whitelist": whitelist,
@@ -156,9 +156,9 @@ async def settings_page(
 ):
     settings_dict = await SettingRepository.get_all_group_settings(session, None)
     return templates.TemplateResponse(
-        "settings.html",
-        {
-            "request": request,
+        request=request,
+        name="settings.html",
+        context={
             "current_admin": current_admin,
             "active_page": "settings",
             "settings_dict": settings_dict,
@@ -175,9 +175,9 @@ async def logs_page(
 ):
     logs = await AuditRepository.get_recent(session, limit=100)
     return templates.TemplateResponse(
-        "logs.html",
-        {
-            "request": request,
+        request=request,
+        name="logs.html",
+        context={
             "current_admin": current_admin,
             "active_page": "logs",
             "logs": logs,
