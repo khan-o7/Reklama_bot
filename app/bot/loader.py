@@ -1,5 +1,7 @@
+import socket
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
 from app.config.settings import settings
@@ -15,9 +17,24 @@ from app.bot.handlers import (
 )
 
 
+class WindowsSafeAiohttpSession(AiohttpSession):
+    """
+    Custom AiohttpSession configured for stable Windows & cross-platform socket behavior:
+    - Enforces IPv4 (socket.AF_INET) to prevent WinError 52 / NetBIOS collisions.
+    - Enables force_close to prevent stale sockets during rapid restarts.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._connector_init["family"] = socket.AF_INET
+        self._connector_init["force_close"] = True
+        self._connector_init["enable_cleanup_closed"] = True
+
+
 def create_bot() -> Bot:
+    session = WindowsSafeAiohttpSession()
     return Bot(
         token=settings.BOT_TOKEN,
+        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
 
