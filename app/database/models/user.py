@@ -25,6 +25,8 @@ class User(Base):
 
     advertisements = relationship("Advertisement", back_populates="user", cascade="all, delete-orphan")
     warnings = relationship("Warning", back_populates="user", cascade="all, delete-orphan")
+    orders = relationship("Order", back_populates="user", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User telegram_id={self.telegram_id} username={self.username}>"

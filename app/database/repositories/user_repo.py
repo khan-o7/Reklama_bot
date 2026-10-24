@@ -116,3 +116,76 @@ class UserRepository:
         stmt = select(User).order_by(desc(User.created_at)).limit(limit)
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_by_id(session: AsyncSession, user_id: int) -> bool:
+        stmt = select(User).where(User.id == user_id)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+        if user:
+            await session.delete(user)
+            await session.commit()
+            return True
+        return False
+
+    @staticmethod
+    async def delete_multiple(session: AsyncSession, user_ids: List[int]) -> int:
+        if not user_ids:
+            return 0
+        from sqlalchemy import delete
+        stmt = delete(User).where(User.id.in_(user_ids))
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def clear_all(session: AsyncSession, exclude_admins: bool = True) -> int:
+        from sqlalchemy import delete
+        stmt = delete(User)
+        if exclude_admins:
+            stmt = stmt.where(User.is_admin == False)  # noqa
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def bulk_reset_warnings(session: AsyncSession, user_ids: List[int]) -> int:
+        if not user_ids:
+            return 0
+        stmt = update(User).where(User.id.in_(user_ids)).values(warnings_count=0)
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def clear_all_warnings(session: AsyncSession) -> int:
+        stmt = update(User).values(warnings_count=0)
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def update_user(
+        session: AsyncSession,
+        user_id: int,
+        first_name: Optional[str] = None,
+        username: Optional[str] = None,
+        warnings_count: Optional[int] = None,
+        is_muted: Optional[bool] = None,
+        is_banned: Optional[bool] = None
+    ) -> Optional[User]:
+        user = await UserRepository.get_by_id(session, user_id)
+        if user:
+            if first_name is not None:
+                user.first_name = first_name
+            if username is not None:
+                user.username = username.lstrip("@") if username else None
+            if warnings_count is not None:
+                user.warnings_count = max(0, warnings_count)
+            if is_muted is not None:
+                user.is_muted = is_muted
+            if is_banned is not None:
+                user.is_banned = is_banned
+            await session.commit()
+            await session.refresh(user)
+        return user

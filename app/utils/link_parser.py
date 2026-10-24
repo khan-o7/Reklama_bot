@@ -1,3 +1,4 @@
+import ipaddress
 import re
 from typing import List, Set
 from urllib.parse import urlparse
@@ -37,14 +38,34 @@ def extract_links(text: str) -> List[str]:
     return list(links)
 
 
+def is_private_ip(domain_or_ip: str) -> bool:
+    """
+    Checks if the host is a private/local IPv4/IPv6 address (RFC 1918, loopback, link-local).
+    E.g., 192.168.x.x, 10.x.x.x, 172.16-31.x.x, 127.0.0.1, localhost.
+    """
+    if not domain_or_ip:
+        return False
+    if domain_or_ip.lower() == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(domain_or_ip)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return False
+
+
 def extract_domain(url: str) -> str:
-    """Extracts lowercase normalized domain from a URL."""
+    """Extracts lowercase normalized domain from a URL or network path."""
     if not url:
         return ""
-    if not url.startswith(("http://", "https://", "ftp://")):
-        url = "http://" + url
+    # Normalize backslashes for Windows UNC / intranet paths (e.g. \\192.168.1.1\share)
+    clean_url = url.replace("\\", "/").strip()
+    if clean_url.startswith("//"):
+        clean_url = clean_url.lstrip("/")
+    if not clean_url.startswith(("http://", "https://", "ftp://")):
+        clean_url = "http://" + clean_url
     try:
-        parsed = urlparse(url)
+        parsed = urlparse(clean_url)
         domain = parsed.netloc.lower()
         # Remove port if present
         if ":" in domain:
@@ -59,12 +80,16 @@ def extract_domain(url: str) -> str:
 
 def is_domain_whitelisted(url: str, whitelist_domains: List[str]) -> bool:
     """
-    Checks if a URL belongs to a whitelisted domain or its subdomains.
-    Example: 'my.gov.uz' matches 'gov.uz'.
+    Checks if a URL belongs to a whitelisted domain, its subdomains, or a private/internal LAN IP.
+    Example: 'my.gov.uz' matches 'gov.uz', '192.168.224.209' is internal private network.
     """
     domain = extract_domain(url)
     if not domain:
         return False
+
+    # Automatically whitelist private intranet and local network addresses
+    if is_private_ip(domain):
+        return True
 
     for allowed in whitelist_domains:
         allowed = allowed.strip().lower()

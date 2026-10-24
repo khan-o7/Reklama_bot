@@ -15,9 +15,21 @@ class Settings(BaseSettings):
         description="Telegram ID of the bot owner"
     )
     ADMINS: Union[str, List[int]] = Field(default="", description="Comma-separated Telegram IDs of admins")
-    ADMIN_USERNAME: str = Field(default="admin", description="Username of admin for contact buttons")
+    ADMIN_USERNAME: str = Field(default="ads_bot_service", description="Username of admin for contact buttons")
     AD_PAYMENT_CARD: str = Field(default="5614683515901387", description="Card number for ad payments")
-    AD_PRICE: str = Field(default="50 000 so‘m", description="Standard price for ad placement")
+    AD_CARDHOLDER_NAME: str = Field(default="ALISHER USMONOV", description="Cardholder name for ad payments")
+    AD_PAYMENT_INSTRUCTIONS: str = Field(
+        default="To‘lovni amalga oshirgach, to‘lov chekini ushbu botga yuboring.\nEslatma: Reklama to‘lov administrator tomonidan tasdiqlangandan keyingina joylashtiriladi.",
+        description="Payment instructions shown to advertiser"
+    )
+    AD_PRICE: str = Field(default="150 000 so‘m", description="Standard price for ad placement")
+    MIN_AD_PRICE: int = Field(default=1000, description="Minimum price in UZS")
+    MAX_AD_PRICE: int = Field(default=100_000_000, description="Maximum price in UZS")
+    TARGET_GROUP_ID: Union[str, int, None] = Field(default=None, description="Explicit target group ID to moderate")
+    AD_PUBLISH_CHANNEL_ID: Union[str, int, None] = Field(default=None, description="Optional separate destination chat ID for publishing")
+    TELEGRAM_PROXY: str = Field(default="", description="Optional HTTP/SOCKS5 proxy for Telegram API requests")
+    REDIS_URL: str = Field(default="", description="Optional Redis URL for caching/coordination")
+    SCHEDULER_INTERVAL_SECONDS: int = Field(default=30, description="Seconds interval for background tasks")
 
     # Database
     DATABASE_URL: str = Field(
@@ -26,10 +38,10 @@ class Settings(BaseSettings):
     )
 
     # Moderation Rules
-    WARNING_DELETE_SECONDS: int = Field(default=15, description="Seconds before auto-deleting warning message")
+    WARNING_DELETE_SECONDS: int = Field(default=0, description="Seconds before auto-deleting warning message (0 to keep)")
     ADVERTISEMENT_THRESHOLD: int = Field(default=40, description="Minimum score to flag as advertisement")
-    AUTO_MUTE: bool = Field(default=True, description="Enable automatic mute escalation")
-    AUTO_BAN: bool = Field(default=True, description="Enable automatic ban escalation")
+    AUTO_MUTE: bool = Field(default=False, description="Enable automatic mute escalation")
+    AUTO_BAN: bool = Field(default=False, description="Enable automatic ban escalation")
     FILTER_ADMINS: bool = Field(default=False, description="Whether to filter group admins too")
 
     # OCR Settings
@@ -38,9 +50,9 @@ class Settings(BaseSettings):
 
     # Escalation Actions
     FIRST_ACTION: str = Field(default="warning", description="Action for 1st offense (warning)")
-    SECOND_ACTION: str = Field(default="mute_10m", description="Action for 2nd offense")
-    THIRD_ACTION: str = Field(default="mute_1h", description="Action for 3rd offense")
-    FOURTH_ACTION: str = Field(default="ban", description="Action for 4th offense")
+    SECOND_ACTION: str = Field(default="warning", description="Action for 2nd offense")
+    THIRD_ACTION: str = Field(default="warning", description="Action for 3rd offense")
+    FOURTH_ACTION: str = Field(default="warning", description="Action for 4th offense")
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")
@@ -48,7 +60,7 @@ class Settings(BaseSettings):
     # Web Admin Panel
     WEB_ADMIN_ENABLED: bool = Field(default=True, description="Enable FastAPI admin dashboard")
     WEB_ADMIN_HOST: str = Field(default="0.0.0.0", description="Admin panel binding host")
-    WEB_ADMIN_PORT: int = Field(default=8000, description="Admin panel port")
+    WEB_ADMIN_PORT: int = Field(default=8090, description="Admin panel port")
     WEB_ADMIN_SECRET_KEY: str = Field(
         default="super-secret-random-key-change-this-in-production-123456789",
         description="JWT session secret key"
@@ -57,7 +69,10 @@ class Settings(BaseSettings):
     WEB_ADMIN_PASSWORD: str = Field(default="admin12345", description="Web admin initial password")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
+            ".env"
+        ),
         env_file_encoding="utf-8",
         extra="ignore"
     )
@@ -82,6 +97,24 @@ class Settings(BaseSettings):
         admin_set = set(self.ADMINS if isinstance(self.ADMINS, list) else [])
         admin_set.add(self.OWNER_ID)
         return list(admin_set)
+
+    @property
+    def target_group_id_int(self) -> Union[int, None]:
+        if not self.TARGET_GROUP_ID:
+            return None
+        try:
+            return int(str(self.TARGET_GROUP_ID).strip())
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def publish_channel_id_int(self) -> Union[int, None]:
+        if not self.AD_PUBLISH_CHANNEL_ID:
+            return None
+        try:
+            return int(str(self.AD_PUBLISH_CHANNEL_ID).strip())
+        except (ValueError, TypeError):
+            return None
 
     @property
     def sync_database_url(self) -> str:

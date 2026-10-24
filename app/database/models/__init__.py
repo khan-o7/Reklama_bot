@@ -7,6 +7,13 @@ from .setting import Setting
 from .audit_log import AuditLog
 from .admin_user import AdminUser
 from .training_sample import TrainingSample
+from .order import Order
+from .payment import Payment
+from .category_model import AdvertisementCategory, CategoryFieldModel, CategoryOptionModel
+from .advertising_request import AdvertisingRequest
+from .advertisement_answer import AdvertisementAnswer
+from .advertisement_media import AdvertisementMedia
+from .publication_job import PublicationJob
 
 __all__ = [
     "User",
@@ -19,4 +26,13 @@ __all__ = [
     "AuditLog",
     "AdminUser",
     "TrainingSample",
+    "Order",
+    "Payment",
+    "AdvertisementCategory",
+    "CategoryFieldModel",
+    "CategoryOptionModel",
+    "AdvertisingRequest",
+    "AdvertisementAnswer",
+    "AdvertisementMedia",
+    "PublicationJob",
 ]

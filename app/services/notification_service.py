@@ -51,24 +51,87 @@ class NotificationService:
         return alert_text
 
     @staticmethod
+    def format_new_ad_request_alert(
+        order_number: str,
+        username: str | None,
+        telegram_id: int,
+        content_type: str,
+        status: str = "Narx belgilanmagan"
+    ) -> str:
+        u_name = f"@{username}" if username else "Mavjud emas"
+        return (
+            "📢 <b>Yangi reklama so‘rovi</b>\n\n"
+            f"<b>So‘rov:</b> <code>{order_number}</code>\n"
+            f"<b>Foydalanuvchi:</b> {u_name}\n"
+            f"<b>Telegram ID:</b> <code>{telegram_id}</code>\n"
+            f"<b>Kontent turi:</b> {content_type}\n"
+            f"<b>Holati:</b> {status}\n\n"
+            "Reklama materialini ko‘rib chiqing va tegishli amalni tanlang."
+        )
+
+    @staticmethod
     async def send_to_admins(
         bot: Bot,
         message: Message,
         analysis: Dict[str, Any],
-        deleted: bool
+        deleted: bool,
+        ad_id: int | None = None,
+        order_id: int | None = None,
+        order_number: str | None = None
     ) -> None:
-        """Sends rich alert and original message copy to all registered admins."""
-        alert_text = NotificationService.format_admin_alert(message, analysis, deleted)
+        """Sends rich alert and original message copy to all registered admins with action buttons."""
+        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+        user = message.from_user
+        u_id = user.id if user else 0
+        u_name = user.username if user else None
+        c_type = analysis.get("message_type", "TEXT")
+
+        if order_number:
+            alert_text = NotificationService.format_new_ad_request_alert(
+                order_number=order_number,
+                username=u_name,
+                telegram_id=u_id,
+                content_type=c_type,
+                status="Narx belgilanmagan"
+            )
+        else:
+            alert_text = NotificationService.format_admin_alert(message, analysis, deleted)
+
         admin_ids = settings.all_admin_ids
+
+        # Build interactive keyboard for admin: Narx belgilash, So'rov tafsilotlari, Bekor qilish
+        keyboard = None
+        target_id = order_id or ad_id
+        if target_id:
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="💰 Narx belgilash",
+                        callback_data=f"set_price:{target_id}"
+                    ),
+                    InlineKeyboardButton(
+                        text="📋 So‘rov tafsilotlari",
+                        callback_data=f"order_details:{target_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="❌ Bekor qilish",
+                        callback_data=f"admin_cancel_order:{target_id}"
+                    )
+                ]
+            ])
 
         for admin_id in admin_ids:
             for attempt in range(1, 3):
                 try:
-                    # 1. Send text alert
+                    # 1. Send text alert with action keyboard
                     await bot.send_message(
                         chat_id=admin_id,
                         text=alert_text,
-                        parse_mode="HTML"
+                        parse_mode="HTML",
+                        reply_markup=keyboard
                     )
 
                     # 2. Try copying original message so admin sees exact media & formatting

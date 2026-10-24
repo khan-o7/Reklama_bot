@@ -6,9 +6,9 @@ services:
     container_name: defender_bot_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: defender_bot
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-defender_bot}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -19,6 +19,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: defender_bot_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   bot:
     build: .
     container_name: defender_bot_worker
@@ -26,14 +40,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres_password@postgres:5432/defender_bot
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@postgres:5432/${POSTGRES_DB:-defender_bot}
+      REDIS_URL: redis://redis:6379/0
       WEB_ADMIN_ENABLED: "false"
     volumes:
       - ./logs:/app/logs
-    command: python -m app.main
+    command: >
+      sh -c "alembic upgrade head && python -m app.main"
 
   admin:
     build: .
@@ -45,7 +63,8 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres_password@postgres:5432/defender_bot
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password}@postgres:5432/${POSTGRES_DB:-defender_bot}
+      REDIS_URL: redis://redis:6379/0
       WEB_ADMIN_ENABLED: "true"
       WEB_ADMIN_HOST: 0.0.0.0
       WEB_ADMIN_PORT: 8000
@@ -57,3 +76,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:

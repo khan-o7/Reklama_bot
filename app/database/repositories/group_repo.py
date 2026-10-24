@@ -82,3 +82,52 @@ class GroupRepository:
         stmt = select(Group).order_by(desc(Group.created_at)).limit(limit)
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_by_id(session: AsyncSession, group_id: int) -> bool:
+        stmt = select(Group).where(Group.id == group_id)
+        result = await session.execute(stmt)
+        group = result.scalar_one_or_none()
+        if group:
+            await session.delete(group)
+            await session.commit()
+            return True
+        return False
+
+    @staticmethod
+    async def delete_multiple(session: AsyncSession, group_ids: List[int]) -> int:
+        if not group_ids:
+            return 0
+        from sqlalchemy import delete
+        stmt = delete(Group).where(Group.id.in_(group_ids))
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def clear_all(session: AsyncSession) -> int:
+        from sqlalchemy import delete
+        stmt = delete(Group)
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount
+
+    @staticmethod
+    async def update_group(
+        session: AsyncSession,
+        group_id: int,
+        title: Optional[str] = None,
+        username: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> Optional[Group]:
+        group = await GroupRepository.get_by_id(session, group_id)
+        if group:
+            if title is not None:
+                group.title = title
+            if username is not None:
+                group.username = username.lstrip("@") if username else None
+            if is_active is not None:
+                group.is_active = is_active
+            await session.commit()
+            await session.refresh(group)
+        return group

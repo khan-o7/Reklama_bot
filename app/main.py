@@ -64,6 +64,29 @@ async def main():
             logger.warning(f"Telegram connection attempt {attempt}/10 failed ({conn_err}). Retrying in 2 seconds...")
             await asyncio.sleep(2)
 
+    # 4.1 Set Bot Commands Menu (displayed in Telegram menu button & autocompleted when typing '/')
+    try:
+        from aiogram.types import BotCommand, BotCommandScopeDefault
+        bot_commands = [
+            BotCommand(command="start", description="Boshlash!"),
+            BotCommand(command="reklama_berish", description="Yangi reklama berish!"),
+            BotCommand(command="admin", description="Adminga murojaat! @ads_bot_service"),
+        ]
+        await bot.set_my_commands(commands=bot_commands, scope=BotCommandScopeDefault())
+        logger.info("Bot commands menu registered: /start, /reklama_berish, /admin")
+    except Exception as cmd_err:
+        logger.warning(f"Failed to set bot commands menu: {cmd_err}")
+
+    # 5. Recover unfinished publication jobs after restart
+    try:
+        from app.services.publication_service import PublicationService
+        async with AsyncSessionLocal() as session:
+            recovered = await PublicationService.recover_unfinished_publications(bot, session)
+            if recovered > 0:
+                logger.info(f"🔄 Restartdan so'ng {recovered} ta tugallanmagan reklama muvaffaqiyatli chop etildi.")
+    except Exception as rec_err:
+        logger.warning(f"Tugallanmagan reklamalarni tiklashda ogohlantirish: {rec_err}")
+
     if settings.WEB_ADMIN_ENABLED:
         logger.info(f"Web Admin Panel available at: http://localhost:{settings.WEB_ADMIN_PORT}")
 
@@ -71,7 +94,7 @@ async def main():
         dp.start_polling(
             bot,
             allowed_updates=dp.resolve_used_update_types(),
-            polling_timeout=30,
+            polling_timeout=20,
             handle_as_tasks=True
         )
     ]

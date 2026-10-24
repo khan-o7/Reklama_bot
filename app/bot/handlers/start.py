@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.settings import settings
 from app.database.repositories.user_repo import UserRepository
 from app.bot.keyboards.admin_kb import get_admin_main_menu
-from app.bot.handlers.ad_order import start_ad_order_workflow
+from app.bot.handlers.ad_order import start_ad_order_workflow, handle_ad_deep_link, get_user_menu_keyboard
 
 router = Router(name="start_router")
 
@@ -42,37 +42,65 @@ async def handle_start(
     )
 
     if message.chat.type == "private":
-        # Check if opened via deep link for ad order: /start ad_order
-        if command and command.args == "ad_order":
-            await start_ad_order_workflow(message, state)
-            return
+        # Check if opened via deep link: /start new_ad, /start ad_<id>, /start ad_order, etc.
+        if command and command.args:
+            args = command.args.strip()
+            if args.startswith("ad_") or args in ("new_ad", "create_ad", "ad_order", "order"):
+                await state.clear()
+                from app.bot.handlers.questionnaire_handler import (
+                    get_categories_keyboard,
+                    QuestionnaireStates,
+                )
+                await state.set_state(QuestionnaireStates.selecting_category)
+
+                # Send persistent reply menu keyboard
+                await message.answer(
+                    "Assalomu alaykum!\n\n"
+                    "🛡 <b>Defender Bot</b> — guruhda reklama joylashtirish xizmati.\n\n"
+                    "Bu yerda siz o‘z e’loningizni qulay va sifatli tarzda shakllantirishingiz mumkin.",
+                    parse_mode="HTML",
+                    reply_markup=get_user_menu_keyboard()
+                )
+
+                # Send category selection inline keyboard
+                text = (
+                    "📋 <b>Yangi reklama yaratish:</b>\n\n"
+                    "Reklama joylashtirish uchun mahsulot / xizmat turini tanlang:\n"
+                    "Quyidagi toifalardan birini tanlang. Bot sizdan kerakli ma’lumotlarni "
+                    "bosqichma-bosqich so‘rab, tayyor va chiroyli e’lon shakllantiradi:"
+                )
+                await message.answer(text, parse_mode="HTML", reply_markup=get_categories_keyboard())
+                return
+
+        welcome_text = (
+            "Assalomu alaykum!\n\n"
+            "🛡 <b>Defender Bot</b> — guruhlarda reklama xavfsizligini ta’minlash va "
+            "rasmiy pullik e’lonlarni qulay hamda sifatli joylashtirish xizmati boti.\n\n"
+            "Bu bot orqali siz o‘z mahsulot yoki xizmatlaringiz bo‘yicha e’lonlarni to‘ldirib, "
+            "guruh qoidalariga mos tarzda rasmiy joylashtirishingiz mumkin.\n\n"
+            "ℹ️ <b>Foydalanish uchun:</b>\n"
+            "• Bosh menyuga qaytish yoki botni yangilash uchun <b>/start</b> bosing.\n"
+            "• Reklama berish uchun quyidagi <b>«📢 Reklama joylash»</b> tugmasidan foydalaning yoki toifani tanlang."
+        )
+
+        from app.bot.handlers.questionnaire_handler import get_start_menu_keyboard
 
         if is_admin:
-            text = (
-                f"Assalomu alaykum, <b>{user.first_name}</b>!\n\n"
-                f"🛡 <b>Defender Bot Admin Paneli</b>ga xush kelibsiz.\n"
-                f"Siz bot boshqaruvchisiz. Quyidagi menyu orqali botni boshqarishingiz mumkin:"
-            )
-            await message.answer(text, parse_mode="HTML", reply_markup=get_admin_main_menu())
-        else:
-            text = (
-                f"Assalomu alaykum, <b>{user.first_name}</b>!\n\n"
-                f"🤖 Men Telegram guruhlarini reklamalar va spamdan himoya qiluvchi "
-                f"hamda rasmiy reklama xizmatlarini qabul qiluvchi <b>Defender Bot</b>man.\n\n"
-                f"📢 Guruh yoki platformalarda reklama joylashtirmoqchi bo‘lsangiz, "
-                f"quyidagi <b>«📢 Reklama berish»</b> tugmasini bosing:"
-            )
-            user_reply_kb = ReplyKeyboardMarkup(
-                keyboard=[[KeyboardButton(text="📢 Reklama berish")]],
-                resize_keyboard=True
-            )
-            user_inline_kb = InlineKeyboardMarkup(
-                inline_keyboard=[[
-                    InlineKeyboardButton(text="📢 Reklama berish", callback_data="start_ad_order")
-                ]]
-            )
-            await message.answer(text, parse_mode="HTML", reply_markup=user_reply_kb)
-            await message.answer("Tanlang:", reply_markup=user_inline_kb)
+            welcome_text += "\n\n🛡 <b>Admin imtiyozi:</b> /admin orqali to‘liq boshqaruv paneliga kirishingiz mumkin."
+
+        # 1. Send intro text with persistent bottom reply keyboard
+        await message.answer(
+            welcome_text,
+            parse_mode="HTML",
+            reply_markup=get_user_menu_keyboard()
+        )
+
+        # 2. Send inline category selection (select qismi)
+        await message.answer(
+            "📋 <b>Reklama joylashtirish uchun mahsulot turini tanlang:</b>",
+            parse_mode="HTML",
+            reply_markup=get_start_menu_keyboard(is_admin=is_admin)
+        )
     else:
         # In groups
         await message.answer(
@@ -82,6 +110,32 @@ async def handle_start(
         )
 
 
+@router.message(Command("reklama_berish"))
+async def handle_cmd_reklama_berish(message: Message, state: FSMContext) -> None:
+    if message.chat.type != "private":
+        return
+    await state.clear()
+    from app.bot.handlers.questionnaire_handler import get_categories_keyboard, QuestionnaireStates
+    await state.set_state(QuestionnaireStates.selecting_category)
+
+    text = (
+        "📋 <b>Reklama joylashtirish uchun mahsulot / xizmat turini tanlang:</b>\n\n"
+        "Quyidagi toifalardan birini tanlang. Bot sizdan kerakli ma’lumotlarni "
+        "bosqichma-bosqich so‘rab, tayyor va chiroyli e’lon shakllantiradi:"
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=get_categories_keyboard())
+
+
+@router.message(Command("cancel"))
+async def handle_cancel(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state:
+        await state.clear()
+        await message.answer("✅ Amal muvaffaqiyatli bekor qilindi.", reply_markup=get_user_menu_keyboard())
+    else:
+        await message.answer("ℹ️ Bekor qilinadigan faol jarayon mavjud emas.", reply_markup=get_user_menu_keyboard())
+
+
 @router.message(Command("help"))
 async def handle_help(message: Message) -> None:
     user = message.from_user
@@ -89,27 +143,32 @@ async def handle_help(message: Message) -> None:
 
     if is_admin:
         text = (
-            "📖 <b>ADMIN BUYRUQLARI RO‘YXATI:</b>\n\n"
-            "• /status — Botning hozirgi holati va statistikasi\n"
-            "• /stats — Bugungi, haftalik va oylik batafsil statistika\n"
-            "• /settings — Guruh va global bot sozlamalari\n"
-            "• /users — Faol va qoidabuzar foydalanuvchilar\n"
-            "• /blacklist — Qora ro‘yxatni ko‘rish va boshqarish\n"
-            "• /whitelist — Oq ro‘yxat (ruxsat etilgan domenlar)\n"
-            "• /warnings — Foydalanuvchining ogohlantirishlarini ko‘rish\n"
-            "• /clusters — Takroriy reklama va kampaniyalarni AI klasterlash\n"
-            "• /mute — Foydalanuvchini yozishdan cheklash (reply qilib)\n"
-            "• /unmute — Foydalanuvchidan cheklovni yechish\n"
-            "• /ban — Foydalanuvchini guruhdan chetlatish\n"
-            "• /unban — Foydalanuvchini bandan chiqarish\n"
-            "• /logs — Oxirgi audit hodisalari jurnali\n"
+            "📖 <b>ADMINISTRATOR BUYRUQLARI:</b>\n\n"
+            "• /admin — Administrator asosiy boshqaruv paneli\n"
+            "• /requests — Barcha reklama so‘rovlari va to‘lovlarni ko‘rish\n"
+            "• /stats — Reklama tushumlari va guruh moderatsiya statistikasi\n"
+            "• /status — Bot va tizim holati (DB, Redis, xotira)\n"
+            "• /settings — Guruh va reklama sozlamalari\n"
+            "• /whitelist — Ruxsat etilgan domenlar oq ro‘yxati\n"
+            "• /blacklist — Taqiqlangan so‘zlar va domenlar qora ro‘yxati\n"
+            "• /cancel — Faol jarayonni bekor qilish\n"
+            "• /logs — Oxirgi audit hodisalari\n"
+            "• /clusters — AI reklama klasterlari\n"
         )
     else:
         text = (
-            "📖 <b>BOT HAQIDA MA’LUMOT:</b>\n\n"
-            "Ushbu bot guruhlardagi reklama, spam va ruxsat etilmagan havolalarni "
-            "avtomatik o‘chiradi va guruh xavfsizligini ta'minlaydi.\n\n"
-            "Admin bilan bog‘lanish uchun guruh administratorlariga murojaat qiling."
+            "📖 <b>REKLAMA JOYLASHTIRISH VA BOT YO‘RIQNOMASI:</b>\n\n"
+            "1️⃣ <b>Reklama joylash:</b> «📢 Reklama joylash» tugmasini bosing va mahsulot turini tanlang.\n"
+            "2️⃣ <b>Ma’lumotlarni kiritish:</b> Bot savollariga javob berib, tayyor e’lon shakllantiring.\n"
+            "3️⃣ <b>Narx va to‘lov:</b> Administrator narx belgilagach, to‘lov chekini ushbu botga yuborasiz.\n"
+            "4️⃣ <b>Tasdiqlash va e’lon:</b> Administrator chekni tasdiqlagach, reklamangiz darhol guruhda e’lon qilinadi.\n\n"
+            "ℹ️ <b>Asosiy buyruqlar:</b>\n"
+            "• /start — Boshlash va asosiy menyu\n"
+            "• /reklama_berish — Yangi reklama berish\n"
+            "• /admin — Adminga murojaat (@ads_bot_service)\n"
+            "• /myorders — Mening reklama so‘rovlarim\n"
+            "• /cancel — Faol amalni bekor qilish\n"
+            "• /help — Yordam ma’lumotlari"
         )
 
-    await message.answer(text, parse_mode="HTML")
+    await message.answer(text, parse_mode="HTML", reply_markup=get_user_menu_keyboard())

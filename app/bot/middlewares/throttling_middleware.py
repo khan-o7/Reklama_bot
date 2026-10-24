@@ -17,6 +17,10 @@ class ThrottlingMiddleware(BaseMiddleware):
         data: Dict[str, Any]
     ) -> Any:
         if isinstance(event, Message) and event.from_user:
+            # Never throttle media group album messages
+            if event.media_group_id:
+                return await handler(event, data)
+
             user_id = event.from_user.id
             now = time.time()
             last_time = self.users.get(user_id, 0.0)

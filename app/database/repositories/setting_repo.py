@@ -9,9 +9,9 @@ class SettingRepository:
         "enabled": "true",
         "delete_ads": "true",
         "warning_enabled": "true",
-        "auto_mute": "true",
-        "auto_ban": "true",
-        "warning_delete_seconds": "15",
+        "auto_mute": "false",
+        "auto_ban": "false",
+        "warning_delete_seconds": "0",
         "advertisement_threshold": "40",
         "filter_admins": "false",
         "filter_links": "true",
@@ -19,9 +19,9 @@ class SettingRepository:
         "filter_videos": "true",
         "filter_documents": "true",
         "first_action": "warning",
-        "second_action": "mute_10m",
-        "third_action": "mute_1h",
-        "fourth_action": "ban",
+        "second_action": "warning",
+        "third_action": "warning",
+        "fourth_action": "warning",
         "warning_message": (
             "⚠️ <b>REKLAMA TAQIQLANGAN</b>\n\n"
             "Hurmatli foydalanuvchi, guruhda reklama yuborish taqiqlangan.\n"

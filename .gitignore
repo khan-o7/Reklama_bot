@@ -32,6 +32,9 @@ wheels/
 .env
 .env.local
 .env.production
+olx_session.json
+app/data/olx_session.json
+app/data/olx_profile/
 
 # IDEs & Editors
 .idea/

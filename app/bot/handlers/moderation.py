@@ -1,3 +1,4 @@
+from typing import Optional, List
 from aiogram import Router, Bot, F
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +24,8 @@ async def process_incoming_message(
     bot: Bot,
     session: AsyncSession,
     is_edited: bool = False,
-    update_type: str = "message"
+    update_type: str = "message",
+    album: Optional[List[Message]] = None
 ) -> None:
     """
     Unified multi-source message processing and moderation pipeline.
@@ -39,6 +41,12 @@ async def process_incoming_message(
 
     # 1. Check Bot & System filter for groups
     if chat_type in ("group", "supergroup"):
+        if settings.target_group_id_int and chat_id != settings.target_group_id_int:
+            return
+        from app.services.publication_service import PublicationService
+        if PublicationService.is_bot_published(chat_id, message.message_id):
+            logger.info(f"🛡️ Bot tomonidan tasdiqlangan va chop etilgan reklama o'tkazib yuborildi | chat={chat_id} msg={message.message_id}")
+            return
         if message.from_user and message.from_user.is_bot:
             return
         if not message.from_user and not message.sender_chat:
@@ -52,7 +60,8 @@ async def process_incoming_message(
         message=message,
         bot=bot,
         is_edited=is_edited,
-        update_type=update_type
+        update_type=update_type,
+        album=album
     )
 
     # 3. Content Hash Deduplication: If edited message content didn't change, avoid duplicate processing
@@ -151,7 +160,9 @@ async def process_incoming_message(
             bot=bot,
             message=message,
             analysis=analysis,
-            session=session
+            session=session,
+            content=content,
+            album=album
         )
     else:
         # 12. Active Learning: If score is in ambiguous boundary (25-40), prompt admins
@@ -171,9 +182,14 @@ async def process_incoming_message(
 # =========================================================================
 
 @router.message(ChatTypeFilter(["group", "supergroup"]))
-async def handle_new_group_message(message: Message, bot: Bot, session: AsyncSession) -> None:
+async def handle_new_group_message(
+    message: Message,
+    bot: Bot,
+    session: AsyncSession,
+    album: Optional[List[Message]] = None
+) -> None:
     """Handles regular messages in groups and supergroups."""
-    await process_incoming_message(message, bot, session, is_edited=False, update_type="message")
+    await process_incoming_message(message, bot, session, is_edited=False, update_type="message", album=album)
 
 
 @router.edited_message(ChatTypeFilter(["group", "supergroup"]))
@@ -183,9 +199,14 @@ async def handle_edited_group_message(message: Message, bot: Bot, session: Async
 
 
 @router.channel_post(ChatTypeFilter(["channel"]))
-async def handle_new_channel_post(message: Message, bot: Bot, session: AsyncSession) -> None:
+async def handle_new_channel_post(
+    message: Message,
+    bot: Bot,
+    session: AsyncSession,
+    album: Optional[List[Message]] = None
+) -> None:
     """Handles new channel posts."""
-    await process_incoming_message(message, bot, session, is_edited=False, update_type="channel_post")
+    await process_incoming_message(message, bot, session, is_edited=False, update_type="channel_post", album=album)
 
 
 @router.edited_channel_post(ChatTypeFilter(["channel"]))

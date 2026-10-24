@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from collections import OrderedDict
 from aiogram import Bot
 from aiogram.types import Message
@@ -26,14 +26,18 @@ class ContentExtractor:
         text: str = "",
         caption: str = "",
         ocr_text: str = "",
-        photo_id: str = ""
+        photo_id: str = "",
+        video_id: str = "",
+        media_id: str = ""
     ) -> str:
         """Computes a deterministic SHA-256 hash for message content components."""
         clean_text = text.strip()
         clean_caption = caption.strip()
         clean_ocr = ocr_text.strip()
         clean_photo = photo_id.strip()
-        payload = f"T:{clean_text}|C:{clean_caption}|O:{clean_ocr}|P:{clean_photo}"
+        clean_video = video_id.strip()
+        clean_media = media_id.strip()
+        payload = f"T:{clean_text}|C:{clean_caption}|O:{clean_ocr}|P:{clean_photo}|V:{clean_video}|M:{clean_media}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     @classmethod
@@ -63,40 +67,100 @@ class ContentExtractor:
         bot: Optional[Bot] = None,
         is_edited: bool = False,
         update_type: str = "message",
-        ocr_override: Optional[str] = None
+        ocr_override: Optional[str] = None,
+        album: Optional[List[Message]] = None
     ) -> Dict[str, Any]:
         """
-        Extracts, combines, and hashes message content across text, caption, and photo OCR.
-        
-        Returns unified content payload:
-        {
-            "text": str,
-            "caption": str,
-            "ocr_text": str,
-            "combined_text": str,
-            "has_photo": bool,
-            "is_edited": bool,
-            "message_id": int,
-            "chat_id": int,
-            "user_id": int,
-            "content_hash": str,
-            "is_duplicate": bool,
-            "update_type": str
-        }
+        Extracts, combines, and hashes message content across text, caption, photo, video,
+        audio, voice, document, animation, video_note, sticker, and contact.
         """
         text = message.text or ""
         caption = message.caption or ""
-        has_photo = bool(message.photo)
-        photo_id = message.photo[-1].file_id if has_photo else ""
+        if album:
+            all_captions = [m.caption for m in album if m.caption]
+            if all_captions:
+                caption = "\n".join(all_captions)
 
-        # 1. OCR Extraction for Photos
+        has_photo = bool(message.photo)
+        has_video = bool(message.video)
+
+        photo_id = getattr(message.photo[-1], "file_id", "") if has_photo else ""
+        video_id = getattr(message.video, "file_id", "") if has_video else ""
+
+        media_type = "TEXT"
+        media_file_id = None
+        media_file_unique_id = None
+        extra_content_parts = []
+
+        if has_photo:
+            media_type = "PHOTO"
+            media_file_id = getattr(message.photo[-1], "file_id", None)
+            media_file_unique_id = getattr(message.photo[-1], "file_unique_id", None)
+        elif has_video:
+            media_type = "VIDEO"
+            media_file_id = getattr(message.video, "file_id", None)
+            media_file_unique_id = getattr(message.video, "file_unique_id", None)
+        elif getattr(message, "animation", None):
+            media_type = "ANIMATION"
+            media_file_id = getattr(message.animation, "file_id", None)
+            media_file_unique_id = getattr(message.animation, "file_unique_id", None)
+        elif getattr(message, "document", None):
+            media_type = "DOCUMENT"
+            media_file_id = getattr(message.document, "file_id", None)
+            media_file_unique_id = getattr(message.document, "file_unique_id", None)
+            doc_name = getattr(message.document, "file_name", "")
+            if doc_name:
+                extra_content_parts.append(doc_name)
+        elif getattr(message, "audio", None):
+            media_type = "AUDIO"
+            media_file_id = getattr(message.audio, "file_id", None)
+            media_file_unique_id = getattr(message.audio, "file_unique_id", None)
+            title = getattr(message.audio, "title", "")
+            performer = getattr(message.audio, "performer", "")
+            if title or performer:
+                extra_content_parts.append(f"{performer} {title}".strip())
+        elif getattr(message, "voice", None):
+            media_type = "VOICE"
+            media_file_id = getattr(message.voice, "file_id", None)
+            media_file_unique_id = getattr(message.voice, "file_unique_id", None)
+        elif getattr(message, "video_note", None):
+            media_type = "VIDEO_NOTE"
+            media_file_id = getattr(message.video_note, "file_id", None)
+            media_file_unique_id = getattr(message.video_note, "file_unique_id", None)
+        elif getattr(message, "sticker", None):
+            media_type = "STICKER"
+            media_file_id = getattr(message.sticker, "file_id", None)
+            media_file_unique_id = getattr(message.sticker, "file_unique_id", None)
+            set_name = getattr(message.sticker, "set_name", "")
+            if set_name:
+                extra_content_parts.append(set_name)
+        elif getattr(message, "contact", None):
+            media_type = "CONTACT"
+            c = message.contact
+            extra_content_parts.append(f"{c.first_name or ''} {c.last_name or ''} {c.phone_number or ''}".strip())
+
+        # Forwarded content hints
+        if getattr(message, "forward_from_chat", None):
+            f_chat = message.forward_from_chat
+            title = getattr(f_chat, "title", "")
+            username = getattr(f_chat, "username", "")
+            if username:
+                extra_content_parts.append(f"@{username}")
+            if title:
+                extra_content_parts.append(title)
+
+        # 1. OCR Extraction for Photos and Video Thumbnails
         ocr_text = ""
         if ocr_override is not None:
             ocr_text = ocr_override.strip()
         elif has_photo and bot:
             ocr_text = await OCRService.extract_text_from_photo(bot, message.photo)
             if ocr_text:
-                logger.info(f"📸 OCR matn aniqlandi | chat={message.chat.id} msg={message.message_id}: '{ocr_text[:80]}'")
+                logger.info(f"📸 OCR matn aniqlandi (Photo) | chat={message.chat.id} msg={message.message_id}: '{ocr_text[:80]}'")
+        elif has_video and bot and getattr(message.video, "thumbnail", None):
+            ocr_text = await OCRService.extract_text_from_photo(bot, [message.video.thumbnail])
+            if ocr_text:
+                logger.info(f"🎥 OCR matn aniqlandi (Video) | chat={message.chat.id} msg={message.message_id}: '{ocr_text[:80]}'")
 
         # 2. Combine textual components
         parts = []
@@ -106,6 +170,8 @@ class ContentExtractor:
             parts.append(caption.strip())
         if ocr_text.strip():
             parts.append(ocr_text.strip())
+        if extra_content_parts:
+            parts.extend(extra_content_parts)
 
         combined_text = " ".join(parts).strip()
 
@@ -122,7 +188,14 @@ class ContentExtractor:
             user_id = message.sender_chat.id
 
         # 5. Content Hashing & Deduplication
-        content_hash = cls.compute_hash(text=text, caption=caption, ocr_text=ocr_text, photo_id=photo_id)
+        content_hash = cls.compute_hash(
+            text=text,
+            caption=caption,
+            ocr_text=ocr_text,
+            photo_id=photo_id,
+            video_id=video_id,
+            media_id=media_file_id or ""
+        )
         is_duplicate = False
 
         if effective_is_edited:
@@ -140,6 +213,10 @@ class ContentExtractor:
             "ocr_text": ocr_text,
             "combined_text": combined_text,
             "has_photo": has_photo,
+            "has_video": has_video,
+            "media_type": media_type,
+            "media_file_id": media_file_id,
+            "media_file_unique_id": media_file_unique_id,
             "is_edited": effective_is_edited,
             "message_id": message_id,
             "chat_id": chat_id,

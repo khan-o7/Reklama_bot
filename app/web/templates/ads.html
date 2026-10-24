@@ -4,21 +4,49 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-white">Aniqlangan Reklamalar</h1>
             <p class="text-slate-400 text-sm mt-0.5">Spam va reklama sababli o‘chirilgan xabarlar jurnali</p>
         </div>
-        <div class="text-sm bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300">
-            Jami: <strong class="text-white">{{ ads|length }}</strong> ta reklama
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+            <button onclick="openClearAllModal()" type="button" class="px-3.5 py-2 text-xs sm:text-sm font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl transition flex items-center gap-2 shadow-sm">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Umumiy tozalash</span>
+            </button>
+            <div class="text-sm bg-slate-900 border border-slate-800 px-4 py-2 rounded-xl text-slate-300">
+                Jami: <strong class="text-white">{{ ads|length }}</strong> ta reklama
+            </div>
         </div>
     </div>
 
+    <!-- Bulk Actions Toolbar (Visible when 1+ selected) -->
+    <div id="bulkToolbar" class="hidden bg-indigo-950/60 border border-indigo-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg transition duration-200">
+        <div class="flex items-center gap-2.5 text-indigo-200 text-sm font-medium">
+            <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse"></span>
+            <span><strong id="selectedCount" class="text-white">0</strong> ta reklama tanlandi</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="submitBulkDelete()" type="button" class="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition flex items-center gap-1.5 shadow-md">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Tanlanganlarni o‘chirish</span>
+            </button>
+            <button onclick="deselectAll()" type="button" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                Bekor qilish
+            </button>
+        </div>
+    </div>
+
+    <!-- Table Card -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <div class="overflow-x-auto">
             <table class="w-full text-left text-xs sm:text-sm">
                 <thead>
                     <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="pb-3 w-10">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer">
+                        </th>
                         <th class="pb-3 font-medium">Vaqt</th>
                         <th class="pb-3 font-medium">Guruh</th>
                         <th class="pb-3 font-medium">Foydalanuvchi</th>
@@ -26,26 +54,34 @@
                         <th class="pb-3 font-medium">Ball</th>
                         <th class="pb-3 font-medium">Sabab & Havolalar</th>
                         <th class="pb-3 font-medium">Matn namunasi</th>
+                        <th class="pb-3 font-medium text-right">Amallar</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-800/60">
                     {% if ads %}
                         {% for ad in ads %}
-                        <tr class="hover:bg-slate-800/30 transition">
-                            <td class="py-3 text-slate-500 whitespace-nowrap text-xs">{{ ad.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <tr class="hover:bg-slate-800/30 transition group" id="row-{{ ad.id }}">
+                            <td class="py-3">
+                                <input type="checkbox" value="{{ ad.id }}" onchange="updateSelection()" class="row-checkbox w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer">
+                            </td>
+                            <td class="py-3 text-slate-500 whitespace-nowrap text-xs">{{ ad.created_at.strftime('%d.%m.%Y %H:%M') if ad.created_at else '-' }}</td>
                             <td class="py-3 font-medium text-slate-300 whitespace-nowrap">{{ ad.group.title if ad.group else '-' }}</td>
                             <td class="py-3 font-medium text-white whitespace-nowrap">
-                                {{ ad.user.first_name if ad.user else 'Noma\'lum' }}
-                                {% if ad.user and ad.user.username %}<span class="text-slate-500 text-xs">(@{{ ad.user.username }})</span>{% endif %}
+                                {{ ad.user.first_name if ad.user else (ad.first_name or 'Noma\'lum') }}
+                                {% if ad.user and ad.user.username %}
+                                    <span class="text-slate-500 text-xs">(@{{ ad.user.username }})</span>
+                                {% elif ad.username %}
+                                    <span class="text-slate-500 text-xs">(@{{ ad.username }})</span>
+                                {% endif %}
                             </td>
                             <td class="py-3">
                                 <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono">
-                                    {{ ad.message_type }}
+                                    {{ ad.message_type or ad.media_type }}
                                 </span>
                             </td>
                             <td class="py-3">
-                                <span class="px-2.5 py-0.5 rounded text-xs font-bold {% if ad.score >= 70 %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
-                                    {{ ad.score }}
+                                <span class="px-2.5 py-0.5 rounded text-xs font-bold {% if (ad.risk_score or ad.score) >= 70 %}bg-rose-500/20 text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                                    {{ ad.risk_score or ad.score }}
                                 </span>
                             </td>
                             <td class="py-3 text-slate-300">
@@ -54,14 +90,24 @@
                                 <p class="text-xs text-indigo-400 font-mono truncate max-w-xs mt-0.5">{{ ad.detected_links }}</p>
                                 {% endif %}
                             </td>
-                            <td class="py-3 text-slate-400 text-xs max-w-sm truncate">
+                            <td class="py-3 text-slate-400 text-xs max-w-xs truncate" title="{{ (ad.text or ad.caption or '') | escape }}">
                                 {{ ad.text or ad.caption or '<i>(Media kontent)</i>' }}
+                            </td>
+                            <td class="py-3 text-right whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-1.5">
+                                    <button onclick="openEditModal('{{ ad.id }}', '{{ ad.status }}', '{{ ad.risk_score or ad.score }}', '{{ (ad.detection_reason or '') | escape }}', {{ (ad.text or ad.caption or '') | tojson }})" type="button" class="p-1.5 px-2.5 text-xs bg-slate-800 hover:bg-indigo-600 text-slate-300 hover:text-white rounded-lg transition border border-slate-700 hover:border-indigo-500" title="Tahrirlash">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    <button onclick="openDeleteModal('{{ ad.id }}')" type="button" class="p-1.5 px-2.5 text-xs bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition border border-slate-700 hover:border-rose-500" title="O‘chirish">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="py-8 text-center text-slate-500">Hech qanday reklama aniqlanmagan.</td>
+                            <td colspan="9" class="py-8 text-center text-slate-500">Hech qanday reklama aniqlanmagan.</td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -69,4 +115,203 @@
         </div>
     </div>
 </div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Edit Ad Modal -->
+<div id="editModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-3">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-indigo-400"></i>
+                <span>Reklamani tahrirlash</span>
+            </h3>
+            <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form action="/api/ads/edit" method="POST" class="space-y-4">
+            <input type="hidden" name="ad_id" id="editAdId">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Status</label>
+                    <select name="status" id="editAdStatus" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <option value="DELETED">DELETED (O‘chirilgan)</option>
+                        <option value="DETECTED">DETECTED (Aniqlangan)</option>
+                        <option value="WAITING_CONTACT">WAITING_CONTACT (Bog‘lanish kutilmoqda)</option>
+                        <option value="PRICE_PENDING">PRICE_PENDING (Narx kutilmoqda)</option>
+                        <option value="WAITING_PAYMENT">WAITING_PAYMENT (To‘lov kutilmoqda)</option>
+                        <option value="PAYMENT_REVIEW">PAYMENT_REVIEW (To‘lov tekshiruvda)</option>
+                        <option value="APPROVED">APPROVED (Tasdiqlangan)</option>
+                        <option value="PUBLISHED">PUBLISHED (Kanalga chiqarilgan)</option>
+                        <option value="CANCELLED">CANCELLED (Bekor qilingan)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Xavf balli (0-100)</label>
+                    <input type="number" name="risk_score" id="editAdScore" min="0" max="100" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Aniqlash sababi</label>
+                <input type="text" name="detection_reason" id="editAdReason" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Xabar matni</label>
+                <textarea name="text" id="editAdText" rows="3" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                    Bekor qilish
+                </button>
+                <button type="submit" class="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-md">
+                    Saqlash
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Single Confirm Modal -->
+<div id="deleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl relative text-center">
+        <div class="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center justify-center mx-auto mb-3 text-xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">Reklamani o‘chirish</h3>
+        <p class="text-slate-400 text-xs mb-5">Haqiqatan ham ushbu reklama yozuvini o‘chirib tashlamoqchimisiz?</p>
+        <form action="/api/ads/delete" method="POST" class="flex justify-center gap-2">
+            <input type="hidden" name="ad_id" id="deleteAdId">
+            <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                Bekor qilish
+            </button>
+            <button type="submit" class="px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition shadow-md">
+                O‘chirish
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Clear All Modal -->
+<div id="clearAllModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden p-4">
+    <div class="bg-slate-900 border border-rose-900/40 rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-center">
+        <div class="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/30 flex items-center justify-center mx-auto mb-3 text-2xl">
+            <i class="fa-solid fa-dumpster-fire"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white mb-1">Barcha reklamalarni tozalash</h3>
+        <p class="text-slate-400 text-xs mb-6">
+            Diqqat! Barcha aniqlangan reklamalar va ularga tegishli buyurtmalar jurnali to‘liq tozalanadi. Bu amalni ortga qaytarib bo‘lmaydi.
+        </p>
+        <form action="/api/ads/clear-all" method="POST" class="flex justify-center gap-3">
+            <button type="button" onclick="closeClearAllModal()" class="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
+                Bekor qilish
+            </button>
+            <button type="submit" class="px-5 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition shadow-lg shadow-rose-600/30">
+                Ha, to‘liq tozalansin
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden Bulk Delete Form -->
+<form id="bulkDeleteForm" action="/api/ads/bulk-delete" method="POST" class="hidden">
+    <input type="hidden" name="ids" id="bulkDeleteIds">
+</form>
+
+<script>
+    function getSelectedIds() {
+        const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function updateSelection() {
+        const selected = getSelectedIds();
+        const bulkToolbar = document.getElementById('bulkToolbar');
+        const selectedCount = document.getElementById('selectedCount');
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const allCheckboxes = document.querySelectorAll('.row-checkbox');
+
+        selectedCount.textContent = selected.length;
+        if (selected.length > 0) {
+            bulkToolbar.classList.remove('hidden');
+        } else {
+            bulkToolbar.classList.add('hidden');
+        }
+
+        if (allCheckboxes.length > 0 && selected.length === allCheckboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else if (selected.length > 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        }
+    }
+
+    function toggleSelectAll(master) {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => { cb.checked = master.checked; });
+        updateSelection();
+    }
+
+    function deselectAll() {
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(cb => { cb.checked = false; });
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        updateSelection();
+    }
+
+    function submitBulkDelete() {
+        const selected = getSelectedIds();
+        if (selected.length === 0) return;
+        if (confirm(`${selected.length} ta reklamani o'chirishni tasdiqlaysizmi?`)) {
+            document.getElementById('bulkDeleteIds').value = selected.join(',');
+            document.getElementById('bulkDeleteForm').submit();
+        }
+    }
+
+    function openEditModal(id, status, score, reason, text) {
+        document.getElementById('editAdId').value = id;
+        document.getElementById('editAdScore').value = score || 0;
+        document.getElementById('editAdReason').value = reason || '';
+        document.getElementById('editAdText').value = text || '';
+
+        const statusSelect = document.getElementById('editAdStatus');
+        let matched = false;
+        for (let opt of statusSelect.options) {
+            if (opt.value === status) {
+                opt.selected = true;
+                matched = true;
+                break;
+            }
+        }
+        if (!matched && status) {
+            const opt = new Option(status, status, true, true);
+            statusSelect.add(opt);
+        }
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function openDeleteModal(id) {
+        document.getElementById('deleteAdId').value = id;
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+    }
+
+    function openClearAllModal() {
+        document.getElementById('clearAllModal').classList.remove('hidden');
+    }
+
+    function closeClearAllModal() {
+        document.getElementById('clearAllModal').classList.add('hidden');
+    }
+</script>
 {% endblock %}

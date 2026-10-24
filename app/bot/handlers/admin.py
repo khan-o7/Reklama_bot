@@ -2,7 +2,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, ChatPermissions
+from aiogram.types import Message, CallbackQuery, ChatPermissions, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
@@ -13,14 +15,28 @@ from app.database.repositories.setting_repo import SettingRepository
 from app.database.repositories.audit_repo import AuditRepository
 from app.database.repositories.ad_repo import AdvertisementRepository
 from app.services.statistics_service import StatisticsService
+from app.services.request_service import RequestService
 from app.services.cluster_service import ClusterService
 from app.services.cache_service import cache
-from app.bot.keyboards.admin_kb import get_admin_main_menu, get_back_to_admin_menu
+from app.bot.keyboards.admin_kb import (
+    get_admin_main_menu,
+    get_back_to_admin_menu,
+    get_requests_dashboard_kb,
+    get_admin_settings_kb,
+)
 from app.utils.logger import logger
 
 router = Router(name="admin_router")
 
 NO_PERMISSION_TEXT = "❌ Sizda bu buyruqdan foydalanish huquqi yo‘q."
+
+
+class AdminDashboardStates(StatesGroup):
+    waiting_for_search_query = State()
+    waiting_for_card_number = State()
+    waiting_for_cardholder = State()
+    waiting_for_default_price = State()
+    waiting_for_target_group = State()
 
 
 async def is_authorized(message: Message, bot: Bot) -> bool:
@@ -36,6 +52,64 @@ async def is_authorized(message: Message, bot: Bot) -> bool:
         except Exception:
             return False
     return False
+
+
+# ==========================================
+# /admin Command
+# ==========================================
+@router.message(Command("admin"))
+async def cmd_admin(message: Message, bot: Bot) -> None:
+    if not await is_authorized(message, bot):
+        admin_contact = settings.ADMIN_USERNAME.lstrip("@")
+        contact_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"✍️ Adminga yozish (@{admin_contact})",
+                        url=f"https://t.me/{admin_contact}"
+                    )
+                ]
+            ]
+        )
+        text = (
+            "👨‍💻 <b>Administratorga murojaat</b>\n\n"
+            "Savol, taklif yoki reklama masalalari bo‘yicha quyidagi profil orqali bog‘lanishingiz mumkin:\n"
+            f"👉 @{admin_contact}\n\n"
+            "<i>Biz imkon qadar tezroq javob beramiz!</i>"
+        )
+        await message.answer(text, parse_mode="HTML", reply_markup=contact_kb)
+        return
+
+    text = (
+        f"Assalomu alaykum, <b>{message.from_user.first_name}</b>!\n\n"
+        f"🛡 <b>Defender Bot Administrator Boshqaruv Paneli</b>\n\n"
+        f"Guruh moderatsiyasi, reklama arizalari, to‘lovlar va tizim sozlamalarini "
+        f"quyidagi menyu orqali boshqarishingiz mumkin:"
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=get_admin_main_menu())
+
+
+# ==========================================
+# /requests Command
+# ==========================================
+@router.message(Command("requests"))
+async def cmd_requests(message: Message, bot: Bot, session: AsyncSession) -> None:
+    if not await is_authorized(message, bot):
+        await message.reply(NO_PERMISSION_TEXT)
+        return
+    items, total_count = await RequestService.get_requests_by_filter(
+        session, status_filter=None, limit=5, offset=0
+    )
+    text = (
+        "📢 <b>REKLAMA SO‘ROVLARI VA TO‘LOVLAR:</b>\n\n"
+        f"Jami arizalar soni: <b>{total_count} ta</b>\n"
+        "Ko‘rib chiqish yoki tafsilotlarni ko‘rish uchun quyidagi arizani tanlang:"
+    )
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_requests_dashboard_kb(items, total_count, "ALL", page=0)
+    )
 
 
 # ==========================================
@@ -58,8 +132,27 @@ async def cmd_stats(message: Message, bot: Bot, session: AsyncSession) -> None:
     if not await is_authorized(message, bot):
         await message.reply(NO_PERMISSION_TEXT)
         return
-    text = await StatisticsService.get_statistics(session)
-    await message.reply(text, parse_mode="HTML")
+    mod_stats = await StatisticsService.get_statistics(session)
+    fin_stats = await RequestService.get_financial_statistics(session)
+    combined = (
+        f"{mod_stats}\n\n"
+        f"💰 <b>REKLAMA MOLIYA VA OPERATSION STATISTIKASI:</b>\n"
+        f"• Jami qabul qilingan so‘rovlar: <b>{fin_stats['total_orders']} ta</b>\n"
+        f"• Bugungi yangi so‘rovlar: <b>{fin_stats['today_orders']} ta</b>\n"
+        f"• Shu oydagi so‘rovlar: <b>{fin_stats['month_orders']} ta</b>\n\n"
+        f"📊 <b>Holatlar bo‘yicha:</b>\n"
+        f"• ⏳ Narx kutilmoqda: <b>{fin_stats['pending_pricing']} ta</b>\n"
+        f"• 💳 To‘lov kutilmoqda: <b>{fin_stats['awaiting_payment']} ta</b>\n"
+        f"• 🧾 Chek tekshiruvda: <b>{fin_stats['receipt_submitted']} ta</b>\n"
+        f"• 📢 Chop etilgan reklamalar: <b>{fin_stats['published']} ta</b>\n"
+        f"• ❌ Rad etilgan to‘lovlar: <b>{fin_stats['rejected']} ta</b>\n"
+        f"• ⚠️ Xatolik yuz berganlar: <b>{fin_stats['failed']} ta</b>\n\n"
+        f"💵 <b>Tushumlar (Bot ma’lumotlari bo‘yicha):</b>\n"
+        f"• Bugungi tasdiqlangan to‘lovlar: <b>{fin_stats['today_revenue']:,} so‘m</b>\n"
+        f"• Jami tasdiqlangan to‘lovlar: <b>{fin_stats['total_revenue']:,} so‘m</b>\n\n"
+        f"<i>(Eslatma: Moliyaviy statistika botda administrator tasdiqlagan arizalar bo‘yicha qayd etilgan ma’lumotdir).</i>"
+    ).replace(",", " ")
+    await message.reply(combined, parse_mode="HTML")
 
 
 # ==========================================
@@ -492,18 +585,116 @@ async def cmd_settings(message: Message, bot: Bot, session: AsyncSession) -> Non
 # ==========================================
 @router.callback_query(F.data == "admin_stats")
 async def cb_stats(callback: CallbackQuery, session: AsyncSession) -> None:
-    text = await StatisticsService.get_statistics(session)
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_back_to_admin_menu())
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    mod_stats = await StatisticsService.get_statistics(session)
+    fin_stats = await RequestService.get_financial_statistics(session)
+    combined = (
+        f"{mod_stats}\n\n"
+        f"💰 <b>REKLAMA MOLIYA VA OPERATSION STATISTIKASI:</b>\n"
+        f"• Jami qabul qilingan so‘rovlar: <b>{fin_stats['total_orders']} ta</b>\n"
+        f"• Bugungi yangi so‘rovlar: <b>{fin_stats['today_orders']} ta</b>\n"
+        f"• Shu oydagi so‘rovlar: <b>{fin_stats['month_orders']} ta</b>\n\n"
+        f"📊 <b>Holatlar bo‘yicha:</b>\n"
+        f"• ⏳ Narx kutilmoqda: <b>{fin_stats['pending_pricing']} ta</b>\n"
+        f"• 💳 To‘lov kutilmoqda: <b>{fin_stats['awaiting_payment']} ta</b>\n"
+        f"• 🧾 Chek tekshiruvda: <b>{fin_stats['receipt_submitted']} ta</b>\n"
+        f"• 📢 Chop etilgan reklamalar: <b>{fin_stats['published']} ta</b>\n"
+        f"• ❌ Rad etilgan to‘lovlar: <b>{fin_stats['rejected']} ta</b>\n"
+        f"• ⚠️ Xatolik yuz berganlar: <b>{fin_stats['failed']} ta</b>\n\n"
+        f"💵 <b>Tushumlar (Bot ma’lumotlari bo‘yicha):</b>\n"
+        f"• Bugungi tasdiqlangan to‘lovlar: <b>{fin_stats['today_revenue']:,} so‘m</b>\n"
+        f"• Jami tasdiqlangan to‘lovlar: <b>{fin_stats['total_revenue']:,} so‘m</b>\n\n"
+        f"<i>(Eslatma: Moliyaviy statistika botda administrator tasdiqlagan arizalar bo‘yicha qayd etilgan ma’lumotdir).</i>"
+    ).replace(",", " ")
+    await callback.message.edit_text(combined, parse_mode="HTML", reply_markup=get_back_to_admin_menu())
+
+
+@router.callback_query(F.data.startswith("admin_requests:"))
+async def cb_admin_requests(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    parts = callback.data.split(":")
+    status_filter = parts[1] if len(parts) > 1 else "ALL"
+    page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+    limit = 5
+    offset = page * limit
+    real_filter = None if status_filter == "ALL" else status_filter
+
+    items, total_count = await RequestService.get_requests_by_filter(
+        session, status_filter=real_filter, limit=limit, offset=offset
+    )
+    status_label = "Barchasi" if status_filter == "ALL" else status_filter
+    text = (
+        f"📢 <b>REKLAMA SO‘ROVLARI ({status_label}):</b>\n\n"
+        f"Mavjud arizalar soni: <b>{total_count} ta</b> (Sahifa: {page + 1})\n"
+        "Batafsil ma’lumot yoki amallar uchun arizani tanlang:"
+    )
+    await callback.message.edit_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_requests_dashboard_kb(items, total_count, status_filter, page, limit)
+    )
+
+
+@router.callback_query(F.data == "admin_req_search")
+async def cb_admin_req_search(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    await state.set_state(AdminDashboardStates.waiting_for_search_query)
+    text = (
+        "🔍 <b>REKLAMA SO‘ROVINI QIDIRISH:</b>\n\n"
+        "Iltimos, qidirilayotgan buyurtma raqamini (masalan: <code>AD-2026-000001</code>) "
+        "yoki foydalanuvchining Telegram ID raqamini yuboring:"
+    )
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.message(AdminDashboardStates.waiting_for_search_query)
+async def handle_admin_search_query(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    if message.from_user.id not in settings.all_admin_ids:
+        return
+    query = (message.text or "").strip()
+    await state.clear()
+    items, total_count = await RequestService.get_requests_by_filter(
+        session, search_query=query, limit=5, offset=0
+    )
+    if not items:
+        await message.answer(
+            f"🔍 «{query}» bo‘yicha hech qanday reklama so‘rovi topilmadi.",
+            reply_markup=get_requests_dashboard_kb([], 0, "ALL", 0)
+        )
+        return
+    text = (
+        f"🔍 <b>«{query}» BO‘YICHA QIDIRUV NATIJALARI:</b>\n\n"
+        f"Topildi: <b>{total_count} ta</b> ariza\n"
+        "Kerakli buyurtmani tanlang:"
+    )
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        reply_markup=get_requests_dashboard_kb(items, total_count, "ALL", 0)
+    )
 
 
 @router.callback_query(F.data == "admin_status")
 async def cb_status(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     text = await StatisticsService.get_bot_status(session)
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_back_to_admin_menu())
 
 
 @router.callback_query(F.data == "admin_logs")
 async def cb_logs(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     recent_logs = await AuditRepository.get_recent(session, limit=8)
     if not recent_logs:
         text = "📋 Audit jurnali hozircha bo‘sh."
@@ -518,6 +709,9 @@ async def cb_logs(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "admin_groups")
 async def cb_groups(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     groups = await GroupRepository.get_all_active(session)
     if not groups:
         text = "👥 Hozircha faol guruhlar yo‘q."
@@ -531,6 +725,9 @@ async def cb_groups(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "admin_whitelist")
 async def cb_whitelist(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     items = await ListRepository.get_all_whitelist(session)
     doms = "\n".join([f"• <code>{i.value}</code>" for i in items]) if items else "• <i>Qo‘shimcha domenlar yo‘q</i>"
     text = f"🛡 <b>OQ RO‘YXAT (WHITELIST):</b>\n\n{doms}\n\n<i>Qo‘shish:</i> <code>/whitelist add domen.uz</code>"
@@ -539,6 +736,9 @@ async def cb_whitelist(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "admin_blacklist")
 async def cb_blacklist(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     items = await ListRepository.get_all_blacklist(session)
     bls = "\n".join([f"• [{i.type}] <code>{i.value}</code>" for i in items]) if items else "• <i>Hozircha bo‘sh</i>"
     text = f"🚫 <b>QORA RO‘YXAT (BLACKLIST):</b>\n\n{bls}\n\n<i>Qo‘shish:</i> <code>/blacklist add word so'z</code>"
@@ -547,16 +747,173 @@ async def cb_blacklist(callback: CallbackQuery, session: AsyncSession) -> None:
 
 @router.callback_query(F.data == "admin_settings")
 async def cb_settings(callback: CallbackQuery, session: AsyncSession) -> None:
-    all_s = await SettingRepository.get_all_group_settings(session, None)
-    lines = ["⚙️ <b>GLOBAL BOT SOZLAMALARI:</b>\n"]
-    for k, v in list(all_s.items())[:8]:
-        lines.append(f"• <b>{k}</b>: <code>{v}</code>")
-    text = "\n".join(lines)
-    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_back_to_admin_menu())
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    db_card = await SettingRepository.get_setting(session, None, "ad_payment_card", settings.AD_PAYMENT_CARD)
+    db_holder = await SettingRepository.get_setting(session, None, "ad_cardholder_name", settings.AD_CARDHOLDER_NAME)
+    db_price = await SettingRepository.get_setting(session, None, "ad_price", str(settings.AD_PRICE))
+    db_target = await SettingRepository.get_setting(session, None, "target_group_id", settings.TARGET_GROUP_ID)
+
+    text = (
+        "⚙️ <b>REKLAMA VA TIZIM SOZLAMALARI:</b>\n\n"
+        f"💳 <b>To‘lov kartasi:</b> <code>{db_card}</code>\n"
+        f"👤 <b>Karta egasi:</b> <code>{db_holder}</code>\n"
+        f"💰 <b>Standart narx:</b> <code>{db_price}</code> so‘m\n"
+        f"🎯 <b>Moderatsiya guruhi ID:</b> <code>{db_target or 'Barcha guruhlar'}</code>\n\n"
+        "O‘zgartirmoqchi bo‘lgan parametrni tanlang:"
+    )
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_settings_kb())
+
+
+@router.callback_query(F.data == "admin_set_card")
+async def cb_set_card(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    await state.set_state(AdminDashboardStates.waiting_for_card_number)
+    await callback.message.answer(
+        "💳 <b>Yangi to‘lov karta raqamini kiriting</b> (masalan: <code>8600 1234 5678 9012</code>):",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.message(AdminDashboardStates.waiting_for_card_number)
+async def handle_set_card_number(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    if message.from_user.id not in settings.all_admin_ids:
+        return
+    card_raw = (message.text or "").replace(" ", "").replace("-", "").strip()
+    if not (card_raw.isdigit() and len(card_raw) == 16):
+        await message.answer("❌ Noto‘g‘ri karta raqami. Karta raqami 16 ta raqamdan iborat bo‘lishi lozim.")
+        return
+
+    formatted = f"{card_raw[:4]} {card_raw[4:8]} {card_raw[8:12]} {card_raw[12:]}"
+    await SettingRepository.set_setting(session, None, "ad_payment_card", formatted)
+    settings.AD_PAYMENT_CARD = formatted
+    await AuditRepository.create(session, "setting_changed", details=f"ad_payment_card updated by {message.from_user.id}")
+    await state.clear()
+    await message.answer(
+        f"✅ To‘lov karta raqami muvaffaqiyatli o‘zgartirildi: <code>{formatted}</code>",
+        parse_mode="HTML",
+        reply_markup=get_admin_main_menu()
+    )
+
+
+@router.callback_query(F.data == "admin_set_cardholder")
+async def cb_set_cardholder(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    await state.set_state(AdminDashboardStates.waiting_for_cardholder)
+    await callback.message.answer(
+        "👤 <b>Yangi karta egasining ism-sharifini kiriting</b> (masalan: <code>Falonchi Pismadonchiyev</code>):",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.message(AdminDashboardStates.waiting_for_cardholder)
+async def handle_set_cardholder(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    if message.from_user.id not in settings.all_admin_ids:
+        return
+    holder = (message.text or "").strip()
+    if len(holder) < 3:
+        await message.answer("❌ Karta egasining ismi kamida 3 ta belgidan iborat bo‘lishi lozim.")
+        return
+
+    await SettingRepository.set_setting(session, None, "ad_cardholder_name", holder)
+    settings.AD_CARDHOLDER_NAME = holder
+    await AuditRepository.create(session, "setting_changed", details=f"ad_cardholder_name updated by {message.from_user.id}")
+    await state.clear()
+    await message.answer(
+        f"✅ Karta egasi muvaffaqiyatli saqlandi: <b>{holder}</b>",
+        parse_mode="HTML",
+        reply_markup=get_admin_main_menu()
+    )
+
+
+@router.callback_query(F.data == "admin_set_price")
+async def cb_set_price(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    await state.set_state(AdminDashboardStates.waiting_for_default_price)
+    await callback.message.answer(
+        f"💰 <b>Standart reklama narxini so‘mda kiriting</b> (masalan: <code>150000</code>)\n"
+        f"Cheklovlar: {settings.MIN_AD_PRICE:,} — {settings.MAX_AD_PRICE:,} so‘m".replace(",", " "),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.message(AdminDashboardStates.waiting_for_default_price)
+async def handle_set_default_price(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    if message.from_user.id not in settings.all_admin_ids:
+        return
+    raw = (message.text or "").replace(" ", "").replace(",", "").strip()
+    if not raw.isdigit():
+        await message.answer("❌ Narx faqat butun musbat son bo‘lishi lozim.")
+        return
+    price = int(raw)
+    if price < settings.MIN_AD_PRICE or price > settings.MAX_AD_PRICE:
+        await message.answer(
+            f"❌ Narx {settings.MIN_AD_PRICE:,} dan {settings.MAX_AD_PRICE:,} so‘mgacha bo‘lishi lozim.".replace(",", " ")
+        )
+        return
+
+    await SettingRepository.set_setting(session, None, "ad_price", str(price))
+    settings.AD_PRICE = price
+    await AuditRepository.create(session, "setting_changed", details=f"ad_price updated to {price} by {message.from_user.id}")
+    await state.clear()
+    await message.answer(
+        f"✅ Standart reklama narxi muvaffaqiyatli saqlandi: <b>{price:,} so‘m</b>".replace(",", " "),
+        parse_mode="HTML",
+        reply_markup=get_admin_main_menu()
+    )
+
+
+@router.callback_query(F.data == "admin_set_target_group")
+async def cb_set_target_group(callback: CallbackQuery, state: FSMContext) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    await state.set_state(AdminDashboardStates.waiting_for_target_group)
+    await callback.message.answer(
+        "🎯 <b>Moderatsiya qilinadigan guruh ID raqamini kiriting</b> (masalan: <code>-1001234567890</code>)\n"
+        "Barcha guruhlar uchun bo‘sh qoldirish yoki <code>0</code> yozishingiz mumkin:",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.message(AdminDashboardStates.waiting_for_target_group)
+async def handle_set_target_group(message: Message, session: AsyncSession, state: FSMContext) -> None:
+    if message.from_user.id not in settings.all_admin_ids:
+        return
+    gid_raw = (message.text or "").strip()
+    val = "" if gid_raw in ("0", "") else gid_raw
+    await SettingRepository.set_setting(session, None, "target_group_id", val)
+    settings.TARGET_GROUP_ID = val
+    await AuditRepository.create(session, "setting_changed", details=f"target_group_id updated to {val} by {message.from_user.id}")
+    await state.clear()
+    await message.answer(
+        f"✅ Moderatsiya guruhi sozlandi: <code>{val or 'Barcha guruhlar'}</code>",
+        parse_mode="HTML",
+        reply_markup=get_admin_main_menu()
+    )
+
+
+@router.callback_query(F.data == "noop")
+async def cb_noop(callback: CallbackQuery) -> None:
+    await callback.answer()
 
 
 @router.callback_query(F.data == "admin_main_menu")
 async def cb_main_menu(callback: CallbackQuery) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
     user = callback.from_user
     text = (
         f"Assalomu alaykum, <b>{user.first_name}</b>!\n\n"
