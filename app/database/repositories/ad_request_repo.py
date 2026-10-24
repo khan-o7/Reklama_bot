@@ -273,3 +273,136 @@ class AdvertisingRequestRepository:
         )
         res = await session.execute(stmt)
         return list(res.scalars().all())
+
+    @staticmethod
+    async def update_olx_status(
+        session: AsyncSession,
+        request_id: int,
+        olx_status: str,
+        olx_ad_id: Optional[str] = None,
+        olx_ad_url: Optional[str] = None,
+        olx_error: Optional[str] = None
+    ) -> Optional[AdvertisingRequest]:
+        req = await AdvertisingRequestRepository.get_by_id(session, request_id)
+        if req:
+            req.olx_status = olx_status
+            if olx_ad_id is not None:
+                req.olx_ad_id = olx_ad_id
+            if olx_ad_url is not None:
+                req.olx_ad_url = olx_ad_url
+            if olx_error is not None:
+                req.olx_error = olx_error
+            if olx_status == "PUBLISHED":
+                req.olx_published_at = datetime.now(timezone.utc)
+                req.olx_error = None
+            await session.commit()
+            await session.refresh(req)
+        return req
+
+    @staticmethod
+    async def get_all_requests_with_details(
+        session: AsyncSession,
+        limit: int = 100,
+        offset: int = 0,
+        status: Optional[str] = None,
+        olx_status: Optional[str] = None
+    ) -> List[AdvertisingRequest]:
+        stmt = select(AdvertisingRequest).order_by(desc(AdvertisingRequest.created_at))
+        if status:
+            stmt = stmt.where(AdvertisingRequest.status == status)
+        if olx_status:
+            stmt = stmt.where(AdvertisingRequest.olx_status == olx_status)
+        stmt = stmt.offset(offset).limit(limit).options(
+            selectinload(AdvertisingRequest.user),
+            selectinload(AdvertisingRequest.group),
+            selectinload(AdvertisingRequest.answers),
+            selectinload(AdvertisingRequest.media_items),
+        )
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
+
+    @staticmethod
+    async def count_all_requests(
+        session: AsyncSession,
+        status: Optional[str] = None,
+        olx_status: Optional[str] = None
+    ) -> int:
+        stmt = select(func.count(AdvertisingRequest.id))
+        if status:
+            stmt = stmt.where(AdvertisingRequest.status == status)
+        if olx_status:
+            stmt = stmt.where(AdvertisingRequest.olx_status == olx_status)
+        res = await session.execute(stmt)
+        return res.scalar_one() or 0
+
+    @staticmethod
+    async def get_olx_metrics(session: AsyncSession) -> Dict[str, int]:
+        total_stmt = select(func.count(AdvertisingRequest.id))
+        published_stmt = select(func.count(AdvertisingRequest.id)).where(AdvertisingRequest.olx_status == "PUBLISHED")
+        pending_stmt = select(func.count(AdvertisingRequest.id)).where(AdvertisingRequest.olx_status.in_(["PENDING", "PUBLISHING"]))
+        failed_stmt = select(func.count(AdvertisingRequest.id)).where(AdvertisingRequest.olx_status == "FAILED")
+
+        total = (await session.execute(total_stmt)).scalar_one() or 0
+        published = (await session.execute(published_stmt)).scalar_one() or 0
+        pending = (await session.execute(pending_stmt)).scalar_one() or 0
+        failed = (await session.execute(failed_stmt)).scalar_one() or 0
+
+        return {
+            "total_requests": total,
+            "olx_published": published,
+            "olx_pending": pending,
+            "olx_failed": failed,
+        }
+
+    @staticmethod
+    async def delete_by_id(session: AsyncSession, request_id: int) -> bool:
+        """Deletes an AdvertisingRequest by ID with cascading delete of answers and media."""
+        stmt = select(AdvertisingRequest).where(AdvertisingRequest.id == request_id)
+        res = await session.execute(stmt)
+        req = res.scalar_one_or_none()
+        if not req:
+            return False
+        await session.delete(req)
+        await session.commit()
+        return True
+
+    @staticmethod
+    async def update_request_content(
+        session: AsyncSession,
+        request_id: int,
+        title: Optional[str] = None,
+        price: Optional[int] = None,
+        currency: Optional[str] = None,
+        phone: Optional[str] = None,
+        location: Optional[str] = None,
+        condition: Optional[str] = None,
+        preview_text: Optional[str] = None
+    ) -> Optional[AdvertisingRequest]:
+        """Updates user ad content attributes and preview_text."""
+        req = await AdvertisingRequestRepository.get_by_id(session, request_id)
+        if not req:
+            return None
+
+        if preview_text is not None:
+            req.preview_text = preview_text.strip()
+        if currency is not None:
+            req.currency = currency.strip()
+
+        if title is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "title", title.strip(), "Sarlavha")
+        if price is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "price", str(price), "Narx")
+        if currency is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "currency", currency.strip(), "Valyuta")
+        if phone is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "phone", phone.strip(), "Telefon")
+        if location is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "location", location.strip(), "Manzil")
+        if condition is not None:
+            await AdvertisingRequestRepository.save_answer(session, request_id, "condition", condition.strip(), "Holati")
+
+        await session.commit()
+        session.expire_all()
+        return await AdvertisingRequestRepository.get_by_id(session, request_id)
+
+

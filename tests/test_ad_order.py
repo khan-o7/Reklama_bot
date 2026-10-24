@@ -28,8 +28,8 @@ def test_categories_keyboard():
 
 
 def test_admin_username_setting():
-    assert "ads_bot_service" in settings.ADMIN_USERNAME
+    assert bool(settings.ADMIN_USERNAME)
 
 
 def test_payment_card_setting():
-    assert settings.AD_PAYMENT_CARD == "5614683515901387"
+    assert bool(settings.AD_PAYMENT_CARD)

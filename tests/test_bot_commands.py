@@ -47,10 +47,10 @@ async def test_cmd_admin_for_regular_user():
 
     # Verify admin contact details
     assert "Administratorga murojaat" in called_text
-    assert "ads_bot_service" in called_text
-    # Verify button URL points to https://t.me/ads_bot_service
+    assert settings.ADMIN_USERNAME in called_text
+    # Verify button URL points to admin telegram
     button = called_kb.inline_keyboard[0][0]
-    assert "https://t.me/ads_bot_service" in button.url
+    assert settings.ADMIN_USERNAME in button.url
 
 
 @pytest.mark.asyncio

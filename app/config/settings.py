@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     WEB_ADMIN_USERNAME: str = Field(default="admin", description="Web admin initial login")
     WEB_ADMIN_PASSWORD: str = Field(default="admin12345", description="Web admin initial password")
 
+    # OLX.uz Integration
+    OLX_ENABLED: bool = Field(default=True, description="Enable OLX automatic posting and management")
+    OLX_AUTO_POST: bool = Field(default=True, description="Automatically post advertisements to OLX upon approval")
+    OLX_SESSION_FILE: str = Field(default="app/data/olx_session.json", description="Path to OLX Playwright session state JSON")
+    OLX_HEADLESS: bool = Field(default=True, description="Whether to run OLX Playwright browser in headless mode")
+    OLX_DEFAULT_CITY: str = Field(default="Toshkent", description="Default city for OLX advert placement")
+    OLX_DEFAULT_PHONE: str = Field(default="", description="Default contact phone for OLX adverts if user did not specify")
+
     model_config = SettingsConfigDict(
         env_file=(
             os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),

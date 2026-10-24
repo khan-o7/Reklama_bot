@@ -39,25 +39,25 @@
     </div>
 
     <!-- Table Card -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+    <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs sm:text-sm">
+            <table class="w-full text-left">
                 <thead>
-                    <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
-                        <th class="pb-3 w-10">
+                    <tr class="bg-slate-800/50 border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="w-12 text-center">
                             <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="w-4 h-4 rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer">
                         </th>
-                        <th class="pb-3 font-medium">Vaqt</th>
-                        <th class="pb-3 font-medium">Guruh</th>
-                        <th class="pb-3 font-medium">Foydalanuvchi</th>
-                        <th class="pb-3 font-medium">Media turi</th>
-                        <th class="pb-3 font-medium">Ball</th>
-                        <th class="pb-3 font-medium">Sabab & Havolalar</th>
-                        <th class="pb-3 font-medium">Matn namunasi</th>
-                        <th class="pb-3 font-medium text-right">Amallar</th>
+                        <th class="min-w-[140px]">Vaqt</th>
+                        <th class="min-w-[160px]">Guruh</th>
+                        <th class="min-w-[180px]">Foydalanuvchi</th>
+                        <th class="min-w-[120px]">Media turi</th>
+                        <th class="min-w-[100px]">Ball</th>
+                        <th class="min-w-[200px]">Sabab & Havolalar</th>
+                        <th class="min-w-[240px] max-w-sm">Matn namunasi</th>
+                        <th class="min-w-[130px] text-right">Amallar</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-slate-800/70 text-sm">
                     {% if ads %}
                         {% for ad in ads %}
                         <tr class="hover:bg-slate-800/30 transition group" id="row-{{ ad.id }}">

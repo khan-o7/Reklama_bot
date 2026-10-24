@@ -14,17 +14,17 @@
         </div>
     </div>
 
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+    <div class="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs sm:text-sm">
+            <table class="w-full text-left">
                 <thead>
-                    <tr class="border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
-                        <th class="pb-3 font-medium">Vaqt</th>
-                        <th class="pb-3 font-medium">Hodisa Turi</th>
-                        <th class="pb-3 font-medium">Batafsil ma’lumot</th>
+                    <tr class="bg-slate-800/50 border-b border-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <th class="min-w-[180px]">Vaqt</th>
+                        <th class="min-w-[200px]">Hodisa Turi</th>
+                        <th class="min-w-[400px]">Batafsil ma’lumot</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-800/60">
+                <tbody class="divide-y divide-slate-800/70 text-sm">
                     {% if logs %}
                         {% for log in logs %}
                         <tr class="hover:bg-slate-800/30 transition">

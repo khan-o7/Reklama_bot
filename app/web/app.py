@@ -7,7 +7,7 @@ from app.config.settings import settings
 from app.database.database import AsyncSessionLocal, init_db
 from app.database.repositories.admin_user_repo import AdminUserRepository
 from app.web.auth import hash_password
-from app.web.routes import auth_router, dashboard_router, api_router
+from app.web.routes import auth_router, dashboard_router, api_router, olx_router
 from app.utils.logger import logger
 
 
@@ -42,5 +42,6 @@ def create_web_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(dashboard_router)
     app.include_router(api_router)
+    app.include_router(olx_router)
 
     return app

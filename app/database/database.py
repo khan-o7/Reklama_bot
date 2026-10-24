@@ -14,13 +14,17 @@ class Base(DeclarativeBase):
 
 
 # Async engine configured with pool pre-ping to ensure stable connections
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
-)
+try:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=False,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20
+    )
+except Exception as _db_init_err:
+    logger.warning(f"Could not initialize primary database engine: {_db_init_err}")
+    engine = None
 
 # Async session factory
 AsyncSessionLocal = async_sessionmaker(
@@ -28,12 +32,14 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False
-)
+) if engine else None
 async_session_factory = AsyncSessionLocal
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Dependency helper to yield async db session."""
+    if not AsyncSessionLocal:
+        raise RuntimeError("Database engine is not initialized (missing driver or invalid configuration).")
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -47,6 +53,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Creates tables if they don't already exist and safely adds newly introduced columns."""
     from sqlalchemy import text
+    if not engine:
+        logger.error("Cannot initialize database: engine is None (missing driver like asyncpg).")
+        return
     try:
         async with engine.begin() as conn:
             # Import models so Base has all table metadata
@@ -74,6 +83,11 @@ async def init_db() -> None:
                 "ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()",
                 "ALTER TABLE payments ADD COLUMN IF NOT EXISTS request_id INTEGER",
                 "ALTER TABLE payments ALTER COLUMN order_id DROP NOT NULL",
+                "ALTER TABLE advertising_requests ADD COLUMN IF NOT EXISTS olx_status VARCHAR(50) DEFAULT 'NONE'",
+                "ALTER TABLE advertising_requests ADD COLUMN IF NOT EXISTS olx_ad_id VARCHAR(100)",
+                "ALTER TABLE advertising_requests ADD COLUMN IF NOT EXISTS olx_ad_url VARCHAR(500)",
+                "ALTER TABLE advertising_requests ADD COLUMN IF NOT EXISTS olx_published_at TIMESTAMP WITH TIME ZONE",
+                "ALTER TABLE advertising_requests ADD COLUMN IF NOT EXISTS olx_error TEXT",
             ]
             for query in alter_queries:
                 try:

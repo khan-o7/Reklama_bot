@@ -1,9 +1,8 @@
 """
-OLX.uz bir martalik avtorizatsiya va sessiyani saqlash skripti.
+OLX.uz bir martalik avtorizatsiya va sessiyani saqlash skripti (Stealth Anti-Detection).
 
-Ushbu skript brauzerni ko'rinadigan (headful) rejimda ochadi.
-Siz o'z OLX akkauntingizga qo'lda kirasiz (SMS/parol orqali),
-so'ngra skript tizimga kirish sessiyasini (cookies va localStorage)
+Ushbu skript brauzerni oddiy inson ochganidek (bot belgilari butunlay yashirilgan) rejimda ochadi.
+Siz o'z OLX akkauntingizga kirasiz, so'ngra skript tizimga kirish sessiyasini (cookies va localStorage)
 'app/data/olx_session.json' fayliga saqlab oladi.
 """
 
@@ -20,44 +19,74 @@ USER_DATA_DIR = DATA_DIR / "olx_profile"
 
 
 async def main():
-    print("=" * 60)
-    print("🛡️  OLX.uz AVTORIZATSIYA VA SESSIYANI SAQLASH SKRIPTI")
-    print("=" * 60)
+    print("=" * 65)
+    print("🛡️  OLX.uz AVTORIZATSIYA VA SESSIYANI SAQLASH (STEALTH REJIM)")
+    print("=" * 65)
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("\n🌐 Brauzer ochilmoqda...")
+    print("\n🌐 Haqiqiy brauzer profili ishga tushirilmoqda...")
 
     async with async_playwright() as p:
-        # Chromium brauzerini xuddi oddiy foydalanuvchidek ishga tushiramiz
-        browser = await p.chromium.launch(
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--start-maximized",
-            ]
-        )
+        context = None
+        # Chrome, Edge yoki Chromium orqali doimiy profil bilan ochamiz
+        for channel in ["chrome", "msedge", None]:
+            try:
+                kwargs = {
+                    "user_data_dir": str(USER_DATA_DIR),
+                    "headless": False,
+                    "ignore_default_args": ["--enable-automation"],
+                    "args": [
+                        "--disable-blink-features=AutomationControlled",
+                        "--start-maximized",
+                        "--no-sandbox",
+                        "--disable-infobars",
+                        "--disable-dev-shm-usage",
+                    ],
+                    "viewport": None,  # Brauzer ekran o'lchamida ochiladi
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+                    "locale": "uz-UZ"
+                }
+                if channel:
+                    kwargs["channel"] = channel
+                context = await p.chromium.launch_persistent_context(**kwargs)
+                if context:
+                    print(f"✅ Brauzer ishga tushdi ({channel or 'Chromium'}).")
+                    break
+            except Exception:
+                continue
 
-        context = await browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
-            locale="uz-UZ"
-        )
+        if not context:
+            raise RuntimeError("Brauzerni ishga tushirib bo'lmadi.")
 
-        page = await context.new_page()
+        # Bot indikatorlarini butunlay yashirish
+        await context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            window.navigator.chrome = { runtime: {} };
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+            Object.defineProperty(navigator, 'languages', {get: () => ['uz-UZ', 'uz', 'ru-RU', 'ru', 'en-US', 'en']});
+        """)
 
-        print("👉 OLX.uz ochilmoqda...")
+        pages = context.pages
+        page = pages[0] if pages else await context.new_page()
+
+        print("👉 OLX.uz bosh sahifasi ochilmoqda...")
         try:
-            await page.goto("https://www.olx.uz/account/", wait_until="domcontentloaded", timeout=60000)
+            await page.goto("https://www.olx.uz/", wait_until="domcontentloaded", timeout=45000)
         except Exception as e:
             print(f"⚠️ Sahifa yuklanishida ogohlantirish: {e}")
 
-        print("\n" + "*" * 60)
-        print("📌 DIQQAT:")
-        print("1. Ochilgan brauzerda OLX akkauntingizga kiring (Telefon va parol/SMS orqali).")
-        print("2. Tizimga muvaffaqiyatli kirib, shaxsiy kabinetingiz ko'ringandan so'ng:")
+        await asyncio.sleep(2)
+
+        print("\n" + "*" * 65)
+        print("📌 YO'RIQNOMA:")
+        print("1. Ochilgan brauzer oynasida:")
+        print("   - Agar robot tekshiruvi (Cloudflare) chiqsa, galochkani bosing.")
+        print("   - Yuqori o'ng burchakdagi 'Hisobingiz' tugmasini bosib OLX ga kiring.")
+        print("2. Tizimga muvaffaqiyatli kirganingizdan so'ng:")
         print("   👉 SHU YERDA 'ENTER' TUGMASINI BOSING!")
-        print("*" * 60 + "\n")
+        print("*" * 65 + "\n")
 
         # Konsolda Enter bosilishini kutish
         loop = asyncio.get_running_loop()
@@ -69,7 +98,7 @@ async def main():
         print(f"✅ MUVAFFAQITYATLI: OLX sessiyasi saqlandi!")
         print(f"📁 Fayl manzili: {SESSION_FILE}")
 
-        await browser.close()
+        await context.close()
         print("\nBrauzer yopildi. Endi bot ushbu sessiyadan avtomatik foydalana oladi.")
 
 

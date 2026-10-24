@@ -10,18 +10,21 @@ def get_admin_main_menu() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="📢 Reklama so‘rovlari", callback_data="admin_requests:ALL:0"),
-                InlineKeyboardButton(text="📊 Statistika & Moliya", callback_data="admin_stats")
+                InlineKeyboardButton(text="🌐 OLX Boshqaruvi", callback_data="admin_olx_menu")
             ],
             [
-                InlineKeyboardButton(text="⚙️ Sozlamalar", callback_data="admin_settings"),
-                InlineKeyboardButton(text="👥 Guruhlar", callback_data="admin_groups")
+                InlineKeyboardButton(text="📊 Statistika & Moliya", callback_data="admin_stats"),
+                InlineKeyboardButton(text="⚙️ Sozlamalar", callback_data="admin_settings")
             ],
             [
-                InlineKeyboardButton(text="🛡 Whitelist", callback_data="admin_whitelist"),
-                InlineKeyboardButton(text="🚫 Blacklist", callback_data="admin_blacklist")
+                InlineKeyboardButton(text="👥 Guruhlar", callback_data="admin_groups"),
+                InlineKeyboardButton(text="🛡 Whitelist", callback_data="admin_whitelist")
             ],
             [
-                InlineKeyboardButton(text="📋 Audit loglar", callback_data="admin_logs"),
+                InlineKeyboardButton(text="🚫 Blacklist", callback_data="admin_blacklist"),
+                InlineKeyboardButton(text="📋 Audit loglar", callback_data="admin_logs")
+            ],
+            [
                 InlineKeyboardButton(text="🤖 Bot holati", callback_data="admin_status")
             ]
         ]
@@ -141,3 +144,24 @@ def get_admin_settings_kb() -> InlineKeyboardMarkup:
             ]
         ]
     )
+
+
+def get_olx_admin_kb(auto_post_enabled: bool) -> InlineKeyboardMarkup:
+    toggle_text = "🟢 Avto-e’lon: YOQILGAN (O‘chirish)" if auto_post_enabled else "🔴 Avto-e’lon: O‘CHIRILGAN (Yoqish)"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=toggle_text, callback_data="admin_olx_toggle_auto")
+            ],
+            [
+                InlineKeyboardButton(text="🔄 Sessiyani tekshirish", callback_data="admin_olx_check_session")
+            ],
+            [
+                InlineKeyboardButton(text="📢 So‘rovlar ro‘yxati (OLX)", callback_data="admin_requests:ALL:0")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️ Asosiy menyu", callback_data="admin_main_menu")
+            ]
+        ]
+    )
+

@@ -510,10 +510,41 @@ async def handle_admin_view_request(callback: CallbackQuery, session: AsyncSessi
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 Narx belgilash", callback_data=f"adm_price:{req.id}")],
+        [InlineKeyboardButton(text="🌐 OLX ga chiqarish", callback_data=f"adm_olx:{req.id}")],
         [InlineKeyboardButton(text="❌ Rad etish", callback_data=f"adm_reject:{req.id}")],
     ])
     await callback.message.reply(text, parse_mode="HTML", reply_markup=kb)
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("adm_olx:"))
+async def handle_admin_push_olx(callback: CallbackQuery, session: AsyncSession) -> None:
+    admin_id = callback.from_user.id
+    if admin_id not in settings.all_admin_ids:
+        await callback.answer("Ruxsat berilmagan.", show_alert=True)
+        return
+
+    req_id = int(callback.data.split(":")[1])
+    req = await AdvertisingRequestRepository.get_by_id(session, req_id)
+    if not req:
+        await callback.answer("So‘rov topilmadi.", show_alert=True)
+        return
+
+    await callback.answer("🌐 OLX ga yuborish boshlandi, biroz kuting...")
+    from app.services.olx_service import OlxService
+    success, url, err = await OlxService.publish_request_to_olx(callback.bot, session, req)
+    if success:
+        await callback.message.reply(
+            f"✅ <b>E’lon OLX.uz ga muvaffaqiyatli joylashtirildi!</b>\n\n"
+            f"So‘rov: <code>{req.request_number}</code>\n"
+            f"🔗 <a href='{url}'>OLX dagi e’lonni ko‘rish</a>",
+            parse_mode="HTML"
+        )
+    else:
+        await callback.message.reply(
+            f"❌ <b>OLX ga joylashtirishda xatolik:</b>\n\n<code>{err}</code>",
+            parse_mode="HTML"
+        )
 
 
 @router.callback_query(F.data.startswith("adm_reject:"))

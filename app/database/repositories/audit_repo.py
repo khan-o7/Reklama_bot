@@ -8,13 +8,16 @@ class AuditRepository:
     @staticmethod
     async def create(
         session: AsyncSession,
-        event_type: str,
+        event_type: Optional[str] = None,
         group_id: Optional[int] = None,
         user_id: Optional[int] = None,
-        details: Optional[str] = None
+        details: Optional[str] = None,
+        action: Optional[str] = None,
+        **kwargs
     ) -> AuditLog:
+        actual_event = event_type or action or kwargs.get("action") or "audit_event"
         log = AuditLog(
-            event_type=event_type,
+            event_type=actual_event,
             group_id=group_id,
             user_id=user_id,
             details=details

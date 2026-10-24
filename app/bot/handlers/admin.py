@@ -14,15 +14,18 @@ from app.database.repositories.list_repo import ListRepository
 from app.database.repositories.setting_repo import SettingRepository
 from app.database.repositories.audit_repo import AuditRepository
 from app.database.repositories.ad_repo import AdvertisementRepository
+from app.database.repositories.ad_request_repo import AdvertisingRequestRepository
 from app.services.statistics_service import StatisticsService
 from app.services.request_service import RequestService
 from app.services.cluster_service import ClusterService
 from app.services.cache_service import cache
+from app.services.olx_service import OlxService
 from app.bot.keyboards.admin_kb import (
     get_admin_main_menu,
     get_back_to_admin_menu,
     get_requests_dashboard_kb,
     get_admin_settings_kb,
+    get_olx_admin_kb,
 )
 from app.utils.logger import logger
 
@@ -921,6 +924,93 @@ async def cb_main_menu(callback: CallbackQuery) -> None:
         f"Quyidagi menyu orqali botni boshqarishingiz mumkin:"
     )
     await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_admin_main_menu())
+
+
+# ==========================================
+# /olx Command & OLX Management Callbacks
+# ==========================================
+async def _build_olx_status_text(session: AsyncSession) -> Tuple[str, bool]:
+    session_status = OlxService.get_session_status()
+    metrics = await AdvertisingRequestRepository.get_olx_metrics(session)
+
+    db_val = await SettingRepository.get_setting(session, None, "olx_auto_post")
+    if db_val is not None:
+        auto_post = db_val.lower() in ("true", "1", "yes")
+    else:
+        auto_post = getattr(settings, "OLX_AUTO_POST", True)
+
+    status_icon = "🟢 Faol" if session_status["is_valid"] else "🔴 Ulangan emas"
+    auto_icon = "🟢 Yoqilgan" if auto_post else "🔴 O‘chirilgan"
+
+    text = (
+        "🌐 <b>OLX.uz INTEGRATSIYASI VA BOSHQARUVI:</b>\n\n"
+        f"• Ulanish holati: <b>{status_icon}</b>\n"
+        f"• Foydalanuvchi: <b>{session_status.get('account_name') or 'Noma’lum'}</b>\n"
+        f"• Sessiya fayli: <code>{session_status.get('updated_at') or 'Mavjud emas'}</code>\n"
+        f"• Avtomatik e’lon: <b>{auto_icon}</b>\n\n"
+        "📊 <b>E’lonlar statistikasi:</b>\n"
+        f"• Jami so‘rovlar: <b>{metrics['total_requests']} ta</b>\n"
+        f"• OLX ga chiqqan: <b>{metrics['olx_published']} ta</b>\n"
+        f"• Jarayonda: <b>{metrics['olx_pending']} ta</b>\n"
+        f"• Xatolik bo‘lgan: <b>{metrics['olx_failed']} ta</b>\n\n"
+        "<i>Sozlamalarni o‘zgartirish uchun quyidagi tugmalardan foydalaning:</i>"
+    )
+    return text, auto_post
+
+
+@router.message(Command("olx"))
+async def cmd_olx(message: Message, bot: Bot, session: AsyncSession) -> None:
+    if not await is_authorized(message, bot):
+        await message.reply(NO_PERMISSION_TEXT)
+        return
+    text, auto_post = await _build_olx_status_text(session)
+    await message.reply(text, parse_mode="HTML", reply_markup=get_olx_admin_kb(auto_post))
+
+
+@router.callback_query(F.data == "admin_olx_menu")
+async def cb_olx_menu(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+    text, auto_post = await _build_olx_status_text(session)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_olx_admin_kb(auto_post))
+
+
+@router.callback_query(F.data == "admin_olx_toggle_auto")
+async def cb_olx_toggle_auto(callback: CallbackQuery, session: AsyncSession) -> None:
+    if callback.from_user.id not in settings.all_admin_ids:
+        await callback.answer(NO_PERMISSION_TEXT, show_alert=True)
+        return
+
+    db_val = await SettingRepository.get_setting(session, None, "olx_auto_post")
+    if db_val is not None:
+        curr = db_val.lower() in ("true", "1", "yes")
+    else:
+        curr = getattr(settings, "OLX_AUTO_POST", True)
+
+    new_val = not curr
+    await SettingRepository.set_setting(session, None, "olx_auto_post", "true" if new_val else "false")
+    settings.OLX_AUTO_POST = new_val
+
+    await AuditRepository.create(
+        session,
+        "setting_changed",
+        details=f"OLX auto-post toggled to {new_val} by {callback.from_user.id}"
+    )
+
+    text, auto_post = await _build_olx_status_text(session)
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=get_olx_admin_kb(auto_post))
+    await callback.answer(f"Avto-e’lon {'yoqildi' if new_val else 'o‘chirildi'}.")
+
+
+@router.callback_query(F.data == "admin_olx_check_session")
+async def cb_olx_check_session(callback: CallbackQuery) -> None:
+    st = OlxService.get_session_status()
+    if st["is_valid"]:
+        msg = f"✅ OLX sessiyasi faol!\nOxirgi yangilanish: {st.get('updated_at')}"
+    else:
+        msg = "❌ OLX sessiyasi topilmadi yoki eskirgan. Admin panel orqali yangilang."
+    await callback.answer(msg, show_alert=True)
 
 
 # ==========================================

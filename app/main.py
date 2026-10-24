@@ -71,9 +71,10 @@ async def main():
             BotCommand(command="start", description="Boshlash!"),
             BotCommand(command="reklama_berish", description="Yangi reklama berish!"),
             BotCommand(command="admin", description="Adminga murojaat! @ads_bot_service"),
+            BotCommand(command="olx", description="OLX integratsiyasi va e'lonlar"),
         ]
         await bot.set_my_commands(commands=bot_commands, scope=BotCommandScopeDefault())
-        logger.info("Bot commands menu registered: /start, /reklama_berish, /admin")
+        logger.info("Bot commands menu registered: /start, /reklama_berish, /admin, /olx")
     except Exception as cmd_err:
         logger.warning(f"Failed to set bot commands menu: {cmd_err}")
 
@@ -122,6 +123,8 @@ def acquire_single_instance_lock(port: int = 49151):
     """
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if sys.platform == "win32" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         s.bind(("127.0.0.1", port))
         s.listen(1)
         return s
@@ -132,16 +135,14 @@ def acquire_single_instance_lock(port: int = 49151):
 if __name__ == "__main__":
     lock_socket = acquire_single_instance_lock(port=49151)
     if not lock_socket:
-        logger.error(
-            "❌ DIQQAT: Defender Bot allaqachon boshqa terminal yoki fonda ishlab turibdi!\n"
-            "Ikkita nusxa bir vaqtda ishlay olmaydi (Telegram polling va Web Admin port 8000 ziddiyati yuzaga keladi).\n"
-            "Iltimos, avvalgi ishlayotgan oynani yoping yoki eski python jarayonini to'xtating."
+        print(
+            "\n[OGOHLANTIRISH] Defender Bot allaqachon boshqa terminalda yoki fonda ishlab turibdi!\n"
+            "Ikkita nusxa bir vaqtda ishlay olmaydi (Telegram polling va Web Admin port 8090 ziddiyati yuzaga keladi).\n"
+            "Iltimos, avvalgi ishlayotgan terminalni yoping yoki eski python jarayonini to'xtating.\n"
         )
         sys.exit(0)
 
-    if sys.platform == "win32":
-        # WindowsSelectorEventLoopPolicy eliminates WinError 52 and socket IOCP issues with aiohttp
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # Windows ProactorEventLoop is the default and fully supports asyncio subprocesses for Playwright
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):

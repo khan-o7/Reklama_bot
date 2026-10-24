@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, Tuple, Set, Any
 from aiogram import Bot
@@ -251,6 +252,23 @@ class PublicationService:
             await session.flush()
 
             logger.info(f"🚀 Reklama so‘rovi guruhga muvaffaqiyatli chop etildi | req={req.request_number} chat={target_chat_id} msg={sent_msg_id}")
+
+            # Trigger automatic OLX.uz advert placement in background if enabled
+            if getattr(settings, "OLX_ENABLED", True) and getattr(settings, "OLX_AUTO_POST", True):
+                req_id_to_post = req.id
+                async def _bg_post_to_olx():
+                    try:
+                        from app.database.database import AsyncSessionLocal
+                        from app.services.olx_service import OlxService
+                        async with AsyncSessionLocal() as bg_session:
+                            bg_req = await AdvertisingRequestRepository.get_by_id(bg_session, req_id_to_post)
+                            if bg_req:
+                                await OlxService.publish_request_to_olx(bot, bg_session, bg_req)
+                    except Exception as bg_err:
+                        logger.error(f"Background OLX posting error for req {req_id_to_post}: {bg_err}")
+
+                asyncio.create_task(_bg_post_to_olx())
+
             return True, sent_msg_id, "Reklama muvaffaqiyatli chop etildi."
 
         except Exception as e:
